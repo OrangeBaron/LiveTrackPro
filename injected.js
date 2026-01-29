@@ -1,13 +1,7 @@
-/**
- * Live Track Pro - Injected Script
- */
-
 (function() {
     console.log("LiveTrackPro: Core System initializing...");
 
-    // =========================================================================
     // 1. CONFIGURAZIONE E STILI
-    // =========================================================================
     const CONFIG = {
         mapUrl: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
         libs: [
@@ -57,17 +51,10 @@
         .ltp-vis-container { height: 500px; width: 100%; border-radius: 8px; border: 1px solid #eee; margin-bottom: 25px; z-index: 0; }
         .ltp-chart-container { height: 250px; width: 100%; border-radius: 8px; border: 1px solid #eee; padding: 10px; position: relative; }
         
-        /* Tabella */
-        .ltp-table-wrapper { overflow-x: auto; }
-        .ltp-table { width: 100%; border-collapse: collapse; font-size: 13px; white-space: nowrap; }
-        .ltp-table th { background: #f8f9fa; color: #555; border-bottom: 2px solid #eee; padding: 12px 15px; text-align: left; }
-        .ltp-table td { padding: 10px 15px; border-bottom: 1px solid #f1f1f1; }
         .ltp-footer { text-align: center; color: #aaa; font-size: 11px; margin-top: 20px; }
     `;
 
-    // =========================================================================
     // 2. DATA MANAGER
-    // =========================================================================
     class DataManager {
         constructor() {
             this.trackPoints = [];
@@ -104,9 +91,7 @@
         }
     }
 
-    // =========================================================================
     // 3. COMPONENTI UI
-    // =========================================================================
 
     class MapComponent {
         constructor(containerId) {
@@ -150,8 +135,10 @@
     }
 
     class ChartComponent {
-        constructor(canvasId) {
+        constructor(canvasId, label, color) {
             this.canvasId = canvasId;
+            this.label = label;
+            this.color = color;
             this.chart = null;
         }
 
@@ -159,19 +146,31 @@
             if (typeof Chart === 'undefined') return;
             const ctx = document.getElementById(this.canvasId).getContext('2d');
             
+            // Helper per convertire HEX in RGB per l'opacità
+            const hexToRgb = (hex) => {
+                const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+                return result ? `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}` : '0, 86, 179';
+            };
+            const rgb = hexToRgb(this.color);
+
             // Gradiente
             const gradient = ctx.createLinearGradient(0, 0, 0, 400);
-            gradient.addColorStop(0, 'rgba(0, 86, 179, 0.4)');
-            gradient.addColorStop(1, 'rgba(0, 86, 179, 0.0)');
+            gradient.addColorStop(0, `rgba(${rgb}, 0.4)`);
+            gradient.addColorStop(1, `rgba(${rgb}, 0.0)`);
 
             this.chart = new Chart(ctx, {
                 type: 'line',
                 data: {
                     labels: [],
                     datasets: [{
-                        label: 'Altitudine (m)', data: [], borderColor: '#0056b3',
-                        backgroundColor: gradient, borderWidth: 2, fill: true,
-                        pointRadius: 0, tension: 0.2
+                        label: this.label, 
+                        data: [], 
+                        borderColor: this.color,
+                        backgroundColor: gradient, 
+                        borderWidth: 2, 
+                        fill: true,
+                        pointRadius: 0, 
+                        tension: 0.2
                     }]
                 },
                 options: {
@@ -183,10 +182,10 @@
             });
         }
 
-        update(points) {
+        update(points, dataExtractor) {
             if (!this.chart || !points.length) return;
             const labels = points.map(p => p.dateTime.split('T')[1].substring(0, 5));
-            const data = points.map(p => p.altitude || null);
+            const data = points.map(dataExtractor);
 
             this.chart.data.labels = labels;
             this.chart.data.datasets[0].data = data;
@@ -199,7 +198,9 @@
             this.dataManager = dataManager;
             this.isInitialized = false;
             this.mapComponent = new MapComponent('map-container');
-            this.chartComponent = new ChartComponent('elevation-chart');
+            // Configurazione grafici: ID Canvas, Etichetta, Colore HEX
+            this.elevationChart = new ChartComponent('elevation-chart', 'Altitudine (m)', '#0056b3');
+            this.speedChart = new ChartComponent('speed-chart', 'Velocità (km/h)', '#0056b3');
         }
 
         async bootstrap() {
@@ -215,7 +216,8 @@
             
             // 3. Inizializza componenti
             this.mapComponent.init();
-            this.chartComponent.init();
+            this.elevationChart.init();
+            this.speedChart.init();
             
             // 4. Collega Dati -> UI
             this.dataManager.subscribe(points => this.refresh(points));
@@ -278,15 +280,14 @@
                 <div class="ltp-card">
                     <h3 style="margin:0 0 10px 0; color:#444;">Percorso Live</h3>
                     <div id="map-container" class="ltp-vis-container"></div>
-                    <h3 style="margin:0 0 10px 0; color:#444;">Profilo Altimetrico</h3>
+                    
+                    <h3 style="margin:20px 0 10px 0; color:#444;">Profilo Altimetrico</h3>
                     <div class="ltp-chart-container"><canvas id="elevation-chart"></canvas></div>
                 </div>
 
-                <div class="ltp-card" style="padding:0; overflow:hidden;">
-                    <div style="padding:20px 20px 0 20px;"><h3 style="margin:0; color:#444;">Log Dati</h3></div>
-                    <div class="ltp-table-wrapper" style="padding:20px;">
-                        <table class="ltp-table"><tbody id="data-table-body"></tbody></table>
-                    </div>
+                <div class="ltp-card">
+                    <h3 style="margin:0 0 10px 0; color:#444;">Profilo Velocità</h3>
+                    <div class="ltp-chart-container"><canvas id="speed-chart"></canvas></div>
                 </div>
                 
                 <div class="ltp-footer">LiveTrackPro Active Interface</div>
@@ -322,43 +323,21 @@
 
             // 2. Visualizzazioni
             this.mapComponent.update(points);
-            this.chartComponent.update(points);
-
-            // 3. Tabella
-            this.renderTable(points.slice(-50).reverse());
+            
+            // Aggiorna Grafici
+            // Altimetria
+            this.elevationChart.update(points, p => p.altitude || null);
+            // Velocità (conversione m/s -> km/h)
+            this.speedChart.update(points, p => p.speed ? (p.speed * 3.6) : 0);
         }
 
         updateTextMetric(id, value) {
             const el = document.getElementById(id);
             if (el) el.innerText = value;
         }
-
-        renderTable(points) {
-            const tbody = document.getElementById('data-table-body');
-            if (!tbody) return;
-            
-            // Ricostruisce la tabella.
-            tbody.innerHTML = points.map(p => {
-                const t = p.dateTime.split('T')[1].replace('Z','');
-                const s = p.speed ? (p.speed * 3.6).toFixed(1) : '-';
-                return `
-                    <tr>
-                        <td style="color:#0056b3; font-weight:500;">${t}</td>
-                        <td>${p.position?.lat.toFixed(5) || '-'}, ${p.position?.lon.toFixed(5) || '-'}</td>
-                        <td>${p.altitude?.toFixed(0) || '-'} m</td>
-                        <td style="font-weight:bold;">${s} km/h</td>
-                        <td style="color:${p.powerWatts ? '#e67e22' : '#ccc'}">${p.powerWatts || '-'} W</td>
-                        <td>${p.cadenceCyclesPerMin || '-'} rpm</td>
-                        <td style="color:${p.heartRateBeatsPerMin ? '#e74c3c' : '#ccc'}">${p.heartRateBeatsPerMin || '-'} bpm</td>
-                    </tr>
-                `;
-            }).join('');
-        }
     }
 
-    // =========================================================================
     // 4. MAIN & INTERCEPTOR
-    // =========================================================================
     
     const dataManager = new DataManager();
     const dashboard = new DashboardUI(dataManager);
