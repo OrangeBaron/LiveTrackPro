@@ -9,21 +9,38 @@
     const processedTimestamps = new Set();
 
     // Sovrascriviamo fetch
-    window.fetch = async function(...args) {
-        // Lasciamo che la richiesta originale parta
-        const responsePromise = originalFetch(...args);
+    window.fetch = function(...args) {
+        // 1. Eseguiamo la fetch originale preservando il contesto
+        const responsePromise = originalFetch.apply(this, args);
 
-        // Controllo se l'URL è quello dei track-points
-        if (args[0] && args[0].toString().includes('track-points')) {
-            responsePromise.then(response => {
-                if (response.ok) {
-                    // Cloniamo la risposta per non consumare quella originale destinata alla pagina Garmin
-                    const clone = response.clone();
-                    clone.json().then(data => {
-                        processData(data);
-                    }).catch(err => console.error("LiveTrackPro: Errore parsing JSON", err));
-                }
-            });
+        // 2. Logica di intercettazione isolata in un blocco try/catch sincrono
+        try {
+            // Estrazione sicura dell'URL
+            let url = '';
+            if (typeof args[0] === 'string') {
+                url = args[0];
+            } else if (args[0] && typeof args[0] === 'object' && args[0].url) {
+                url = args[0].url;
+            }
+
+            // Controllo se è l'URL dei track-points
+            if (url && url.includes('track-points')) {
+                responsePromise
+                    .then(response => {
+                        // Lavoriamo solo se la risposta è OK
+                        if (response.ok) {
+                            // Cloniamo la risposta
+                            response.clone().json()
+                                .then(data => processData(data))
+                                .catch(err => console.warn("LiveTrackPro: JSON Warning", err));
+                        }
+                    })
+                    .catch(() => {
+                        // CATCH SILENZIOSO
+                    });
+            }
+        } catch (e) {
+            console.warn("LiveTrackPro: Errore interno nell'interceptor", e);
         }
 
         return responsePromise;
@@ -37,7 +54,7 @@
         }
 
         if (data.trackPoints && data.trackPoints.length > 0) {
-            // 1. Filtriamo solo i punti che non abbiamo ancora processato (Deduplica)
+            // 1. Filtriamo solo i punti che non abbiamo ancora processato
             const newPoints = data.trackPoints.filter(point => {
                 if (!point.dateTime) return false;
                 if (processedTimestamps.has(point.dateTime)) {
@@ -56,7 +73,6 @@
                 });
 
                 // 3. Ordiniamo tutto l'array in ordine Cronologico Inverso (dal più recente al più vecchio)
-                // Se preferisci il più vecchio in alto, scambia a e b nel sort.
                 allTrackPoints.sort((a, b) => new Date(b.dateTime) - new Date(a.dateTime));
 
                 // 4. Aggiorniamo la tabella con l'array ordinato e pulito
@@ -66,28 +82,24 @@
     }
 
     function initDashboard() {
-        // ID univoco per la nostra dashboard
         const dashboardId = 'livetrack-pro-dashboard';
         if (document.getElementById(dashboardId)) return;
 
         // --- NASCONDIAMO L'INTERFACCIA ORIGINALE ---
-        // Invece di un overlay, nascondiamo i figli diretti del body.
-        // Non usiamo .remove() perché il codice Garmin originale deve continuare a girare.
         Array.from(document.body.children).forEach(child => {
-            if (child.tagName !== 'SCRIPT') { // Non tocchiamo gli script
+            if (child.tagName !== 'SCRIPT') {
                 child.style.display = 'none';
             }
         });
 
-        // Impostiamo il body per ospitare la nostra app
         document.body.style.margin = "0";
         document.body.style.padding = "0";
         document.body.style.backgroundColor = "#f4f4f4";
-        document.body.style.overflow = "auto"; // Riabilitiamo lo scroll nativo
+        document.body.style.overflow = "auto";
 
-        // Creazione Container Principale
         const container = document.createElement('div');
         container.id = dashboardId;
+        // Stili inline per brevità (come nel tuo originale)
         container.style.fontFamily = "'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
         container.style.padding = "20px";
         container.style.maxWidth = "1200px";
@@ -100,7 +112,7 @@
             <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 2px solid #0056b3; padding-bottom:15px; margin-bottom:25px;">
                 <div>
                     <h1 style="margin: 0; color: #333; font-size: 28px;">Live Track Pro</h1>
-                    <span style="font-size: 12px; color: #777;">GARMIN DATA INTERCEPTOR</span>
+                    <span style="font-size: 12px; color: #777;">GARMIN DATA INTERCEPTOR - TRAKA 200 EDITION</span>
                 </div>
                 <div id="status-log" style="text-align:right; color: #666; font-size: 13px;">
                     In attesa di dati...
@@ -140,20 +152,16 @@
         
         if(!tbody) return;
 
-        // Aggiorniamo lo stato
-        const lastPoint = allTrackPoints[0]; // Poiché sono ordinati dal più recente
+        const lastPoint = allTrackPoints[0];
         const lastTime = lastPoint ? lastPoint.dateTime.split('T')[1].replace('Z','') : '--:--:--';
         status.innerHTML = `
             <strong>ULTIMO AGGIORNAMENTO:</strong> ${lastTime}<br>
             Punti Totali: ${allTrackPoints.length}
         `;
 
-        // Ricostruiamo la tabella (metodo più pulito per garantire l'ordine corretto)
-        // Per performance su dataset enormi si potrebbe ottimizzare, ma per sessioni live va bene.
         tbody.innerHTML = '';
 
         allTrackPoints.forEach(point => {
-            // Calcoli e formattazione
             const speedKmh = point.speed ? (point.speed * 3.6).toFixed(1) : '-';
             const time = point.dateTime ? point.dateTime.split('T')[1].replace('Z','') : '-';
             const hr = point.heartRateBeatsPerMin || '-';
@@ -166,7 +174,6 @@
             const tr = document.createElement('tr');
             tr.style.borderBottom = "1px solid #f1f1f1";
             
-            // Stile riga
             tr.innerHTML = `
                 <td style="padding: 12px 15px; color: #0056b3; font-weight: 500;">${time}</td>
                 <td style="padding: 12px 15px; color: #555;">${lat}, ${lon}</td>
