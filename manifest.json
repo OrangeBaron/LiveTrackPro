@@ -15,6 +15,7 @@
   "content_scripts": [
     {
       "matches": ["https://livetrack.garmin.com/session/*"],
+      "css": ["dashboard.css"],
       "js": ["content.js"],
       "run_at": "document_start"
     }

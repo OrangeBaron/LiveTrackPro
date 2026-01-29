@@ -1,7 +1,7 @@
 (function() {
     console.log("LiveTrackPro: Core System initializing...");
 
-    // 1. CONFIGURAZIONE E STILI
+    // 1. CONFIGURAZIONE
     const CONFIG = {
         mapUrl: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
         libs: [
@@ -12,47 +12,6 @@
             'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'
         ]
     };
-
-    const DASHBOARD_STYLES = `
-        body { margin: 0; padding: 0; background-color: #f0f2f5; overflow: auto; }
-        #livetrack-pro-dashboard {
-            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            padding: 20px; width: 95%; margin: 0 auto; box-sizing: border-box;
-        }
-        .ltp-card {
-            background: white; padding: 20px; border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-bottom: 20px;
-        }
-        .ltp-header {
-            display: flex; justify-content: space-between; align-items: center; padding: 15px 25px;
-        }
-        .ltp-title { margin: 0; color: #1a1a1a; font-size: 26px; font-weight: 700; }
-        .ltp-subtitle { font-weight: 300; color: #666; font-size: 18px; }
-        .ltp-status { text-align: right; color: #666; font-size: 13px; }
-        
-        /* Grid Metriche */
-        .ltp-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 20px; }
-        .ltp-metric-box {
-            background: white; padding: 20px; border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05); border-left: 5px solid #ccc;
-        }
-        .ltp-metric-label { font-size: 12px; text-transform: uppercase; color: #888; font-weight: 600; margin-bottom: 5px; }
-        .ltp-metric-value-group { display: flex; align-items: baseline; }
-        .ltp-value { font-size: 32px; font-weight: 700; color: #1a1a1a; }
-        .ltp-unit { font-size: 14px; color: #666; margin-left: 5px; }
-
-        /* Colori Metriche */
-        .border-blue { border-color: #0056b3; }
-        .border-orange { border-color: #e67e22; }
-        .border-purple { border-color: #9b59b6; }
-        .border-red { border-color: #e74c3c; }
-        
-        /* Container Visualizzazioni */
-        .ltp-vis-container { height: 500px; width: 100%; border-radius: 8px; border: 1px solid #eee; margin-bottom: 25px; z-index: 0; }
-        .ltp-chart-container { height: 250px; width: 100%; border-radius: 8px; border: 1px solid #eee; padding: 10px; position: relative; }
-        
-        .ltp-footer { text-align: center; color: #aaa; font-size: 11px; margin-top: 20px; }
-    `;
 
     // 2. DATA MANAGER
     class DataManager {
@@ -211,7 +170,6 @@
             
             // 2. Prepara il DOM
             this.cleanOriginalUI();
-            this.injectStyles();
             this.renderStructure();
             
             // 3. Inizializza componenti
@@ -251,12 +209,6 @@
             Array.from(document.body.children).forEach(child => {
                 if (child.tagName !== 'SCRIPT') child.style.display = 'none';
             });
-        }
-
-        injectStyles() {
-            const style = document.createElement('style');
-            style.textContent = DASHBOARD_STYLES;
-            document.head.appendChild(style);
         }
 
         renderStructure() {
