@@ -7,9 +7,15 @@ export class DashboardUI {
         this.dataManager = dataManager;
         this.isInitialized = false;
         
+        // --- COLONNA 1 (Geografica/Fisica) ---
         this.mapComponent = new MapComponent('map-container');
-        this.elevationChart = new ChartComponent('elevation-chart', 'Altitudine (m)', CONFIG.colors.chartPrimary, true);
-        this.speedChart = new ChartComponent('speed-chart', 'Velocità (km/h)', CONFIG.colors.chartPrimary, false);
+        this.elevationChart = new ChartComponent('elevation-chart', 'Altitudine (m)', CONFIG.colors.chartPrimary);
+        this.speedChart = new ChartComponent('speed-chart', 'Velocità (km/h)', CONFIG.colors.chartPrimary);
+        
+        // --- COLONNA 2 (Fisiologica/Avanzata) ---
+        // 'dual-line' e 'bar' sono i tipi gestiti dal nuovo ChartComponent
+        this.advancedChart = new ChartComponent('advanced-chart', '', '', 'dual-line'); 
+        this.zonesChart = new ChartComponent('zones-chart', 'Tempo in Zona (min)', '', 'bar');
     }
 
     async bootstrap() {
@@ -19,21 +25,30 @@ export class DashboardUI {
         this.cleanOriginalUI();
         this.renderStructure();
         
+        // Inizializzazione Componenti Colonna 1
         this.mapComponent.init();
         this.elevationChart.init();
         this.speedChart.init();
         
+        // Inizializzazione Componenti Colonna 2
+        // initDualLine richiede: Label1, Color1, Label2, Color2
+        this.advancedChart.initDualLine(
+            "W' Balance (J)", 
+            CONFIG.colors.wPrime, 
+            "Efficiency (Pw/HR)", 
+            CONFIG.colors.efficiency
+        );
+        this.zonesChart.init(); // Si inizializza come bar chart (definito nel costruttore)
+        
+        // Sottoscrizione ai dati
         this.dataManager.subscribe(data => this.refresh(data));
         
         this.isInitialized = true;
         console.log("LiveTrackPro: UI Loaded & Ready.");
 
-        // FIX RACE CONDITION
+        // Recupero dati pregressi se esistenti (fix race condition)
         if (this.dataManager.hasReceivedLive) {
-            this.refresh({
-                live: this.dataManager.livePoints,
-                course: this.dataManager.coursePoints
-            });
+            this.dataManager.notify(); // Forza un refresh immediato
         }
     }
 
@@ -56,6 +71,7 @@ export class DashboardUI {
     }
 
     cleanOriginalUI() {
+        // Nasconde tutti i figli diretti del body tranne gli script
         Array.from(document.body.children).forEach(child => {
             if (child.tagName !== 'SCRIPT') child.style.display = 'none';
         });
@@ -64,10 +80,12 @@ export class DashboardUI {
     renderStructure() {
         const container = document.createElement('div');
         container.id = 'livetrack-pro-dashboard';
+        
+        // Template HTML
         container.innerHTML = `
             <div class="ltp-card ltp-header">
                 <div>
-                    <h1 class="ltp-title">Live Track Pro <span class="ltp-subtitle">| Dashboard</span></h1>
+                    <h1 class="ltp-title">Live Track Pro <span class="ltp-subtitle">| Analytics</span></h1>
                 </div>
                 <div id="status-log" class="ltp-status">In attesa di dati...</div>
             </div>
@@ -79,20 +97,48 @@ export class DashboardUI {
                 ${this.createMetricBox('hr', 'Heart Rate', 'bpm', 'border-red')}
             </div>
 
-            <div class="ltp-card">
-                <h3 style="margin:0 0 10px 0; color:#444;">Percorso Live</h3>
-                <div id="map-container" class="ltp-vis-container"></div>
+            <div class="ltp-content-grid">
                 
-                <h3 style="margin:20px 0 10px 0; color:#444;">Profilo Altimetrico</h3>
-                <div class="ltp-chart-container"><canvas id="elevation-chart"></canvas></div>
-            </div>
+                <div class="ltp-column">
+                    <div class="ltp-card">
+                        <h3 style="margin:0 0 10px 0; color:#444;">Posizione & Percorso</h3>
+                        <div id="map-container" class="ltp-vis-container"></div>
+                    </div>
 
-            <div class="ltp-card">
-                <h3 style="margin:0 0 10px 0; color:#444;">Profilo Velocità</h3>
-                <div class="ltp-chart-container"><canvas id="speed-chart"></canvas></div>
+                    <div class="ltp-card">
+                        <h3 style="margin:0 0 10px 0; color:#444;">Profilo Altimetrico</h3>
+                        <div class="ltp-chart-container"><canvas id="elevation-chart"></canvas></div>
+                    </div>
+
+                    <div class="ltp-card">
+                        <h3 style="margin:0 0 10px 0; color:#444;">Profilo Velocità</h3>
+                        <div class="ltp-chart-container"><canvas id="speed-chart"></canvas></div>
+                    </div>
+                </div>
+
+                <div class="ltp-column">
+                    <div class="ltp-card">
+                        <h3 style="margin:0 0 5px 0; color:#444;">Riserva Energetica & Efficienza</h3>
+                        <p style="font-size:11px; color:#666; margin:0 0 15px 0;">
+                            <span style="color:${CONFIG.colors.wPrime}">●</span> W' Balance (J) &nbsp; 
+                            <span style="color:${CONFIG.colors.efficiency}">●</span> Efficienza (Watt/HR)
+                        </p>
+                        <div class="ltp-vis-container" style="height: 300px;">
+                            <canvas id="advanced-chart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="ltp-card">
+                        <h3 style="margin:0 0 10px 0; color:#444;">Distribuzione Zone Cardiache</h3>
+                        <div class="ltp-chart-container" style="height: 300px;">
+                            <canvas id="zones-chart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
             </div>
             
-            <div class="ltp-footer">LiveTrackPro Active Interface</div>
+            <div class="ltp-footer">LiveTrackPro Active Interface v2.0</div>
         `;
         document.body.appendChild(container);
     }
@@ -108,30 +154,30 @@ export class DashboardUI {
             </div>`;
     }
 
-    refresh({ live, course }) {
+    // Metodo principale di aggiornamento
+    refresh({ live, course, zones }) {
         if (!live || live.length === 0) return;
         const lastPoint = live[live.length - 1];
 
-        // Header info
-        const timeStr = lastPoint.dateTime.split('T')[1].replace('Z', '');
+        // 1. Aggiornamento Header Info
+        const timeStr = lastPoint.dateTime.split('T')[1].replace('Z', '').split('.')[0]; // HH:MM:SS
         document.getElementById('status-log').innerHTML = 
             `<strong>UPDATED:</strong> ${timeStr} &bull; <strong>PTS:</strong> ${live.length}`;
 
-        // Metriche
+        // 2. Aggiornamento Metriche Testuali
         this.updateTextMetric('live-speed', lastPoint.speed ? (lastPoint.speed * 3.6).toFixed(1) : '-');
         this.updateTextMetric('live-power', lastPoint.powerWatts || '-');
         this.updateTextMetric('live-cadence', lastPoint.cadenceCyclesPerMin || '-');
         this.updateTextMetric('live-hr', lastPoint.heartRateBeatsPerMin || '-');
 
-        // Mappa
+        // 3. Aggiornamento Colonna 1 (Standard)
         this.mapComponent.update(live, course);
         
-        // Grafici
         this.elevationChart.update(
             live, 
             course, 
-            p => (p.altitude !== undefined ? p.altitude : p.elevation), 
-            p => p.altitude 
+            p => (p.altitude !== undefined ? p.altitude : p.elevation), // Estrattore Live
+            p => p.altitude // Estrattore Course
         );
 
         this.speedChart.update(
@@ -140,6 +186,14 @@ export class DashboardUI {
             p => p.speed ? (p.speed * 3.6) : 0, 
             null
         );
+
+        // 4. Aggiornamento Colonna 2 (Advanced)
+        // Passiamo l'intero array 'live' al grafico dual-line, 
+        // il componente estrarrà internamente wPrimeBal e efficiency
+        this.advancedChart.update(live); 
+        
+        // Passiamo l'array accumulatore delle zone (secondi)
+        this.zonesChart.update(zones);
     }
 
     updateTextMetric(id, value) {
