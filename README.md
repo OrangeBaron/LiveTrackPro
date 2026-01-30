@@ -58,11 +58,12 @@ athlete: {
 
 Il progetto è in attiva evoluzione. I prossimi passi includono:
 
-* [ ] Normalized vs Average Power
 * [ ] Total Work e Total Time
+* [ ] Normalized vs Average Power
 * [ ] Intensity Factor
 * [ ] Pendenza vs VAM
 * [ ] Condizioni e previsioni meteo
+* [ ] Sistema di avvisi in tempo reale
 * [ ] Esportazione e replay delle attività passate
 
 ---
