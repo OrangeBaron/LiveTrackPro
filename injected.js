@@ -1,7 +1,25 @@
 (function() {
     console.log("LiveTrackPro: Core System initializing...");
 
+    // ---------------------------------------------------------
+    // 0. UTILS & HELPERS
+    // ---------------------------------------------------------
+    function getDistanceFromLatLonInMeters(lat1, lon1, lat2, lon2) {
+        if (lat1 == null || lon1 == null || lat2 == null || lon2 == null) return 0;
+        const R = 6371000; // Raggio Terra in metri
+        const dLat = (lat2 - lat1) * (Math.PI / 180);
+        const dLon = (lon2 - lon1) * (Math.PI / 180);
+        const a =
+            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c;
+    }
+
+    // ---------------------------------------------------------
     // 1. CONFIGURAZIONE
+    // ---------------------------------------------------------
     const CONFIG = {
         mapUrl: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
         libs: [
@@ -10,14 +28,30 @@
         ],
         css: [
             'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'
-        ]
+        ],
+        colors: {
+            liveLine: '#e67e22',   // Arancione (Track Reale)
+            courseLine: '#95a5a6', // Grigio (Track Prevista)
+            marker: '#0056b3',
+            chartPrimary: '#0056b3',
+            chartSecondary: '#bdc3c7'
+        }
     };
 
+    // ---------------------------------------------------------
     // 2. DATA MANAGER
+    // ---------------------------------------------------------
     class DataManager {
         constructor() {
-            this.trackPoints = [];
-            this.processedTimestamps = new Set();
+            // Usiamo una Map per deduplicare automaticamente tramite timestamp
+            this.rawLivePoints = new Map(); 
+            this.livePoints = [];   // Array ordinato e processato
+            this.coursePoints = []; // Array ordinato e processato
+            
+            // Stato Ricezione
+            this.hasReceivedCourses = false;
+            this.hasReceivedLive = false;
+            
             this.listeners = [];
         }
 
@@ -26,37 +60,106 @@
         }
 
         notify() {
-            // Ordine cronologico
-            this.trackPoints.sort((a, b) => new Date(a.dateTime) - new Date(b.dateTime));
-            this.listeners.forEach(cb => cb(this.trackPoints));
+            if (this.hasReceivedCourses && this.hasReceivedLive) {
+                this.listeners.forEach(cb => cb({
+                    live: this.livePoints,
+                    course: this.coursePoints
+                }));
+            }
         }
 
-        ingest(data) {
+        // Gestione Traccia Pianificata (Course)
+        ingestCourse(data) {
+            const points = data.geoPoints || data.trackPoints || [];
+            
+            this.coursePoints = [];
+            let distAccumulator = 0;
+
+            for (let i = 0; i < points.length; i++) {
+                const p = points[i];
+                const lat = p.latitude || p.lat;
+                const lon = p.longitude || p.lon;
+                // Normalizziamo subito l'elevazione
+                const ele = p.elevation || p.altitude || 0;
+
+                if (i > 0) {
+                    const prev = this.coursePoints[i - 1];
+                    distAccumulator += getDistanceFromLatLonInMeters(prev.lat, prev.lon, lat, lon);
+                }
+
+                this.coursePoints.push({
+                    lat: lat,
+                    lon: lon,
+                    altitude: ele,
+                    totalDistanceMeters: distAccumulator
+                });
+            }
+
+            console.log(`LiveTrackPro: Course ingested. Points: ${this.coursePoints.length}`);
+            this.hasReceivedCourses = true;
+            this.notify();
+        }
+
+        // Gestione Traccia Reale (Live)
+        ingestLive(data) {
             if (!data.trackPoints || data.trackPoints.length === 0) return;
 
-            let hasNewData = false;
+            // 1. Merge dei dati grezzi nella Map (gestisce duplicati e aggiornamenti)
             data.trackPoints.forEach(point => {
-                if (point.dateTime && !this.processedTimestamps.has(point.dateTime)) {
-                    this.processedTimestamps.add(point.dateTime);
-                    this.trackPoints.push(point);
-                    hasNewData = true;
+                if (point.dateTime) {
+                    this.rawLivePoints.set(point.dateTime, point);
                 }
             });
 
-            if (hasNewData) {
-                console.log(`LiveTrackPro: Ingested ${data.trackPoints.length} points.`);
-                this.notify();
+            // 2. Ricostruiamo l'array ordinato cronologicamente
+            // Questo corregge eventuali punti arrivati in ritardo (out-of-order)
+            const sortedPoints = Array.from(this.rawLivePoints.values())
+                .sort((a, b) => new Date(a.dateTime) - new Date(b.dateTime));
+
+            // 3. Ricalcolo Distanze (fondamentale se abbiamo inserito punti nel mezzo)
+            let distAccumulator = 0;
+            
+            // Iteriamo modificando l'oggetto (o arricchendolo)
+            for (let i = 0; i < sortedPoints.length; i++) {
+                const p = sortedPoints[i];
+                
+                if (i > 0) {
+                    const prev = sortedPoints[i - 1];
+                    
+                    if (p.position && prev.position) {
+                        const d = getDistanceFromLatLonInMeters(
+                            prev.position.lat, prev.position.lon,
+                            p.position.lat, p.position.lon
+                        );
+                        distAccumulator += d;
+                    }
+                }
+                
+                p.totalDistanceMeters = distAccumulator;
             }
+
+            this.livePoints = sortedPoints;
+            
+            // Logica di prima attivazione
+            if (!this.hasReceivedLive) {
+                this.hasReceivedLive = true;
+                console.log(`LiveTrackPro: First Live Data sync. Points: ${this.livePoints.length}`);
+            }
+            
+            this.notify();
         }
     }
 
+    // ---------------------------------------------------------
     // 3. COMPONENTI UI
+    // ---------------------------------------------------------
 
     class MapComponent {
         constructor(containerId) {
             this.containerId = containerId;
             this.map = null;
-            this.polyline = null;
+            this.livePolyline = null;
+            this.coursePolyline = null;
             this.marker = null;
         }
 
@@ -64,40 +167,63 @@
             if (!window.L) return;
             this.map = L.map(this.containerId, { zoomControl: false }).setView([0, 0], 13);
             L.tileLayer(CONFIG.mapUrl, { attribution: '© OpenStreetMap' }).addTo(this.map);
-            this.polyline = L.polyline([], { color: '#e67e22', weight: 5 }).addTo(this.map);
+            
+            this.coursePolyline = L.polyline([], { 
+                color: CONFIG.colors.courseLine, 
+                weight: 4, 
+                dashArray: '5, 10', 
+                opacity: 0.7 
+            }).addTo(this.map);
+
+            this.livePolyline = L.polyline([], { 
+                color: CONFIG.colors.liveLine, 
+                weight: 5 
+            }).addTo(this.map);
         }
 
-        update(points) {
-            if (!this.map || !points.length) return;
+        update(livePoints, coursePoints) {
+            if (!this.map) return;
 
-            const latLngs = points
+            // Disegna Course (se esiste)
+            if (coursePoints && coursePoints.length > 0) {
+                const courseLatLngs = coursePoints.map(p => [p.lat, p.lon]);
+                this.coursePolyline.setLatLngs(courseLatLngs);
+                // Fit bounds solo se abbiamo pochi punti live (avvio)
+                if (livePoints.length < 5) {
+                    this.map.fitBounds(this.coursePolyline.getBounds());
+                }
+            }
+
+            // Disegna Live Track
+            const liveLatLngs = livePoints
                 .filter(p => p.position && p.position.lat && p.position.lon)
                 .map(p => [p.position.lat, p.position.lon]);
 
-            if (latLngs.length > 0) {
-                this.polyline.setLatLngs(latLngs);
-                const lastPos = latLngs[latLngs.length - 1];
+            if (liveLatLngs.length > 0) {
+                this.livePolyline.setLatLngs(liveLatLngs);
+                const lastPos = liveLatLngs[liveLatLngs.length - 1];
 
                 if (!this.marker) {
                     this.marker = L.circleMarker(lastPos, {
-                        radius: 8, fillColor: "#0056b3", color: "#fff", 
+                        radius: 8, fillColor: CONFIG.colors.marker, color: "#fff", 
                         weight: 2, opacity: 1, fillOpacity: 0.8
                     }).addTo(this.map);
                 } else {
                     this.marker.setLatLng(lastPos);
                 }
-
-                // Auto-follow
-                latLngs.length < 5 ? this.map.setView(lastPos, 14) : this.map.panTo(lastPos);
+                
+                // Pan sul ciclista
+                this.map.panTo(lastPos);
             }
         }
     }
 
     class ChartComponent {
-        constructor(canvasId, label, color) {
+        constructor(canvasId, label, color, isDualSeries = false) {
             this.canvasId = canvasId;
             this.label = label;
             this.color = color;
+            this.isDualSeries = isDualSeries;
             this.chart = null;
         }
 
@@ -105,49 +231,81 @@
             if (typeof Chart === 'undefined') return;
             const ctx = document.getElementById(this.canvasId).getContext('2d');
             
-            // Helper per convertire HEX in RGB per l'opacità
-            const hexToRgb = (hex) => {
-                const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-                return result ? `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}` : '0, 86, 179';
-            };
-            const rgb = hexToRgb(this.color);
+            const datasets = [];
 
-            // Gradiente
-            const gradient = ctx.createLinearGradient(0, 0, 0, 400);
-            gradient.addColorStop(0, `rgba(${rgb}, 0.4)`);
-            gradient.addColorStop(1, `rgba(${rgb}, 0.0)`);
+            // Serie "Prevista" (Background)
+            if (this.isDualSeries) {
+                datasets.push({
+                    label: 'Previsto',
+                    data: [],
+                    borderColor: CONFIG.colors.chartSecondary,
+                    backgroundColor: 'rgba(0,0,0,0)',
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    borderDash: [5, 5],
+                    fill: false,
+                    tension: 0.1,
+                    order: 2
+                });
+            }
+
+            // Serie "Live" (Foreground)
+            datasets.push({
+                label: this.label, 
+                data: [],
+                borderColor: this.color,
+                backgroundColor: this.color + '33', // Opacity hack
+                borderWidth: 2, 
+                fill: true,
+                pointRadius: 0, 
+                tension: 0.2,
+                order: 1
+            });
 
             this.chart = new Chart(ctx, {
                 type: 'line',
-                data: {
-                    labels: [],
-                    datasets: [{
-                        label: this.label, 
-                        data: [], 
-                        borderColor: this.color,
-                        backgroundColor: gradient, 
-                        borderWidth: 2, 
-                        fill: true,
-                        pointRadius: 0, 
-                        tension: 0.2
-                    }]
-                },
+                data: { datasets: datasets },
                 options: {
                     responsive: true, maintainAspectRatio: false, animation: false,
-                    plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false } },
-                    scales: { x: { display: false }, y: { beginAtZero: false, grid: { color: '#f0f0f0' } } },
+                    plugins: { 
+                        legend: { display: this.isDualSeries },
+                        tooltip: { mode: 'index', intersect: false } 
+                    },
+                    scales: { 
+                        x: { 
+                            type: 'linear', 
+                            grid: { display: false },
+                            min: 0
+                        }, 
+                        y: { 
+                            beginAtZero: false, 
+                            grid: { color: '#f0f0f0' } 
+                        } 
+                    },
                     interaction: { mode: 'nearest', axis: 'x', intersect: false }
                 }
             });
         }
 
-        update(points, dataExtractor) {
-            if (!this.chart || !points.length) return;
-            const labels = points.map(p => p.dateTime.split('T')[1].substring(0, 5));
-            const data = points.map(dataExtractor);
+        update(livePoints, coursePoints, dataExtractor, courseExtractor) {
+            if (!this.chart) return;
+            
+            const toXY = (points, extractor) => {
+                return points.map(p => ({
+                    x: (p.totalDistanceMeters || 0) / 1000, // Metri -> KM
+                    y: extractor(p)
+                })).filter(pt => pt.y !== null && !isNaN(pt.y));
+            };
 
-            this.chart.data.labels = labels;
-            this.chart.data.datasets[0].data = data;
+            // Aggiorna Live (ultimo dataset)
+            const liveIndex = this.chart.data.datasets.length - 1;
+            this.chart.data.datasets[liveIndex].data = toXY(livePoints, dataExtractor);
+
+            // Aggiorna Course (primo dataset, se esiste)
+            if (this.isDualSeries && coursePoints && coursePoints.length > 0) {
+                this.chart.data.datasets[0].data = toXY(coursePoints, courseExtractor);
+            }
+
             this.chart.update();
         }
     }
@@ -156,45 +314,45 @@
         constructor(dataManager) {
             this.dataManager = dataManager;
             this.isInitialized = false;
+            
             this.mapComponent = new MapComponent('map-container');
-            // Configurazione grafici: ID Canvas, Etichetta, Colore HEX
-            this.elevationChart = new ChartComponent('elevation-chart', 'Altitudine (m)', '#0056b3');
-            this.speedChart = new ChartComponent('speed-chart', 'Velocità (km/h)', '#0056b3');
+            this.elevationChart = new ChartComponent('elevation-chart', 'Altitudine (m)', CONFIG.colors.chartPrimary, true);
+            this.speedChart = new ChartComponent('speed-chart', 'Velocità (km/h)', CONFIG.colors.chartPrimary, false);
         }
 
         async bootstrap() {
             if (this.isInitialized) return;
             
-            // 1. Carica risorse esterne
             await this.loadResources();
-            
-            // 2. Prepara il DOM
             this.cleanOriginalUI();
             this.renderStructure();
             
-            // 3. Inizializza componenti
             this.mapComponent.init();
             this.elevationChart.init();
             this.speedChart.init();
             
-            // 4. Collega Dati -> UI
-            this.dataManager.subscribe(points => this.refresh(points));
+            this.dataManager.subscribe(data => this.refresh(data));
             
             this.isInitialized = true;
-            console.log("LiveTrackPro: UI Loaded.");
+            console.log("LiveTrackPro: UI Loaded & Ready.");
+
+            // FIX RACE CONDITION: Se i dati sono arrivati mentre caricavamo, aggiorna subito
+            if (this.dataManager.hasReceivedLive) {
+                this.refresh({
+                    live: this.dataManager.livePoints,
+                    course: this.dataManager.coursePoints
+                });
+            }
         }
 
         loadResources() {
             const head = document.head;
-            
-            // Carica CSS Leaflet
             CONFIG.css.forEach(href => {
                 const link = document.createElement('link');
                 link.rel = 'stylesheet'; link.href = href;
                 head.appendChild(link);
             });
 
-            // Carica JS Scripts
             const scripts = CONFIG.libs.map(src => {
                 return new Promise((resolve, reject) => {
                     const s = document.createElement('script');
@@ -258,29 +416,39 @@
                 </div>`;
         }
 
-        refresh(points) {
-            const lastPoint = points[points.length - 1];
-            if (!lastPoint) return;
+        refresh({ live, course }) {
+            if (!live || live.length === 0) return;
+            const lastPoint = live[live.length - 1];
 
-            // Aggiorna Status Header
+            // Header info
             const timeStr = lastPoint.dateTime.split('T')[1].replace('Z', '');
             document.getElementById('status-log').innerHTML = 
-                `<strong>UPDATED:</strong> ${timeStr} &bull; <strong>PTS:</strong> ${points.length}`;
+                `<strong>UPDATED:</strong> ${timeStr} &bull; <strong>PTS:</strong> ${live.length}`;
 
-            // 1. Metriche Testuali
+            // Metriche
             this.updateTextMetric('live-speed', lastPoint.speed ? (lastPoint.speed * 3.6).toFixed(1) : '-');
             this.updateTextMetric('live-power', lastPoint.powerWatts || '-');
             this.updateTextMetric('live-cadence', lastPoint.cadenceCyclesPerMin || '-');
             this.updateTextMetric('live-hr', lastPoint.heartRateBeatsPerMin || '-');
 
-            // 2. Visualizzazioni
-            this.mapComponent.update(points);
+            // Mappa
+            this.mapComponent.update(live, course);
             
-            // Aggiorna Grafici
-            // Altimetria
-            this.elevationChart.update(points, p => p.altitude || null);
-            // Velocità (conversione m/s -> km/h)
-            this.speedChart.update(points, p => p.speed ? (p.speed * 3.6) : 0);
+            // Grafici
+            // Check di sicurezza: p.altitude o p.elevation per evitare grafici piatti
+            this.elevationChart.update(
+                live, 
+                course, 
+                p => (p.altitude !== undefined ? p.altitude : p.elevation), 
+                p => p.altitude 
+            );
+
+            this.speedChart.update(
+                live, 
+                null,
+                p => p.speed ? (p.speed * 3.6) : 0, 
+                null
+            );
         }
 
         updateTextMetric(id, value) {
@@ -289,12 +457,13 @@
         }
     }
 
+    // ---------------------------------------------------------
     // 4. MAIN & INTERCEPTOR
+    // ---------------------------------------------------------
     
     const dataManager = new DataManager();
     const dashboard = new DashboardUI(dataManager);
     
-    // Interceptor di rete
     const originalFetch = window.fetch;
     window.fetch = function(...args) {
         const responsePromise = originalFetch.apply(this, args);
@@ -302,20 +471,40 @@
         try {
             const url = (typeof args[0] === 'string') ? args[0] : (args[0]?.url || '');
             
-            if (url.includes('track-points')) {
-                // Trovati dati interessanti
-                if (!dashboard.isInitialized) {
-                    dashboard.bootstrap();
-                }
-
+            // Gestione Course (Percorso)
+            if (url.includes('courses') || url.includes('course')) {
                 responsePromise.then(res => {
                     if (res.ok) {
                         res.clone().json()
-                            .then(data => dataManager.ingest(data))
-                            .catch(e => console.warn("LiveTrackPro: JSON Parse error", e));
+                            .then(data => {
+                                dataManager.ingestCourse(data);
+                                // Avvia dashboard se abbiamo tutto
+                                if (dataManager.hasReceivedCourses && dataManager.hasReceivedLive && !dashboard.isInitialized) {
+                                    dashboard.bootstrap();
+                                }
+                            })
+                            .catch(e => console.warn("LiveTrackPro: Course parse error", e));
                     }
                 }).catch(() => {});
             }
+
+            // Gestione Live Track
+            if (url.includes('common') || url.includes('trackPoints') || url.includes('track-points')) {
+                responsePromise.then(res => {
+                    if (res.ok) {
+                        res.clone().json()
+                            .then(data => {
+                                dataManager.ingestLive(data);
+                                // Avvia dashboard se abbiamo tutto
+                                if (dataManager.hasReceivedCourses && dataManager.hasReceivedLive && !dashboard.isInitialized) {
+                                    dashboard.bootstrap();
+                                }
+                            })
+                            .catch(e => console.warn("LiveTrackPro: Live points parse error", e));
+                    }
+                }).catch(() => {});
+            }
+
         } catch (e) {
             console.warn("LiveTrackPro: Interceptor error", e);
         }
