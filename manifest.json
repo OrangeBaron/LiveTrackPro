@@ -3,12 +3,23 @@
   "name": "Live Track Pro",
   "version": "1.0",
   "description": "Sostituisce l'interfaccia di Garmin con una dashboard professionale",
+  "icons": {
+    "256": "icon.png"
+  },
   "host_permissions": [
     "https://livetrack.garmin.com/*"
   ],
   "web_accessible_resources": [
     {
-      "resources": ["injected.js"],
+      "resources": [
+        "src/main.js", 
+        "src/config.js", 
+        "src/utils.js", 
+        "src/managers/DataManager.js", 
+        "src/components/MapComponent.js", 
+        "src/components/ChartComponent.js", 
+        "src/ui/DashboardUI.js"
+      ],
       "matches": ["<all_urls>"]
     }
   ],
