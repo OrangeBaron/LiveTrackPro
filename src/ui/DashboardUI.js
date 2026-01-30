@@ -13,6 +13,9 @@ export class DashboardUI {
         this.speedChart = new ChartComponent('speed-chart', 'Velocità (km/h)', CONFIG.colors.chartPrimary);
         
         // --- COLONNA 2 (Fisiologica/Avanzata) ---
+        // Nuovo Grafico: Potenza e Cuore
+        this.powerHrChart = new ChartComponent('power-hr-chart', '', '', 'dual-line');
+
         // 'dual-line' e 'bar' sono i tipi gestiti dal nuovo ChartComponent
         this.advancedChart = new ChartComponent('advanced-chart', '', '', 'dual-line'); 
         this.zonesChart = new ChartComponent('zones-chart', 'Tempo in Zona (min)', '', 'bar');
@@ -31,13 +34,25 @@ export class DashboardUI {
         this.speedChart.init();
         
         // Inizializzazione Componenti Colonna 2
-        // initDualLine richiede: Label1, Color1, Label2, Color2
+        
+        // 1. Nuovo Grafico Power & HR
+        this.powerHrChart.initDualLine(
+            "Power (W)", 
+            "#e67e22", // Arancio (Uso codici hardcoded per coerenza con CSS)
+            "Heart Rate (bpm)", 
+            "#e74c3c", // Rosso
+            false      // False = Linea continua (non tratteggiata) per HR
+        );
+
+        // 2. Grafico W' Balance & Efficiency
         this.advancedChart.initDualLine(
             "W' Balance (J)", 
             CONFIG.colors.wPrime, 
             "Efficiency (Pw/HR)", 
-            CONFIG.colors.efficiency
+            CONFIG.colors.efficiency,
+            true       // True = Linea tratteggiata per Efficiency
         );
+        
         this.zonesChart.init(); // Si inizializza come bar chart (definito nel costruttore)
         
         // Sottoscrizione ai dati
@@ -118,6 +133,17 @@ export class DashboardUI {
 
                 <div class="ltp-column">
                     <div class="ltp-card">
+                        <h3 style="margin:0 0 5px 0; color:#444;">Potenza & Cuore</h3>
+                        <p style="font-size:11px; color:#666; margin:0 0 15px 0;">
+                            <span style="color:#e67e22">●</span> Power (W) &nbsp; 
+                            <span style="color:#e74c3c">●</span> Heart Rate (bpm)
+                        </p>
+                        <div class="ltp-vis-container" style="height: 300px;">
+                            <canvas id="power-hr-chart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="ltp-card">
                         <h3 style="margin:0 0 5px 0; color:#444;">Riserva Energetica & Efficienza</h3>
                         <p style="font-size:11px; color:#666; margin:0 0 15px 0;">
                             <span style="color:${CONFIG.colors.wPrime}">●</span> W' Balance (J) &nbsp; 
@@ -138,7 +164,7 @@ export class DashboardUI {
 
             </div>
             
-            <div class="ltp-footer">LiveTrackPro Active Interface v2.0</div>
+            <div class="ltp-footer">LiveTrackPro Active Interface v2.1</div>
         `;
         document.body.appendChild(container);
     }
@@ -188,9 +214,23 @@ export class DashboardUI {
         );
 
         // 4. Aggiornamento Colonna 2 (Advanced)
-        // Passiamo l'intero array 'live' al grafico dual-line, 
-        // il componente estrarrà internamente wPrimeBal e efficiency
-        this.advancedChart.update(live); 
+        
+        // Aggiorniamo il nuovo grafico Power/HR passando gli estrattori specifici
+        this.powerHrChart.update(
+            live,
+            null,
+            p => p.powerWatts,           // Dataset 0 (Left Axis)
+            p => p.heartRateBeatsPerMin  // Dataset 1 (Right Axis)
+        );
+
+        // Aggiorniamo il grafico W'/Efficiency passando gli estrattori specifici
+        // (necessario ora che abbiamo reso la logica generica)
+        this.advancedChart.update(
+            live, 
+            null,
+            p => p.wPrimeBal, // Dataset 0
+            p => p.efficiency // Dataset 1
+        ); 
         
         // Passiamo l'array accumulatore delle zone (secondi)
         this.zonesChart.update(zones);

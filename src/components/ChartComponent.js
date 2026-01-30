@@ -103,8 +103,9 @@ export class ChartComponent {
         }
     }
 
-    // --- METODO SPECIALE PER GRAFICO AVANZATO (W' + Efficiency) ---
-    initDualLine(label1, color1, label2, color2) {
+    // --- METODO SPECIALE PER GRAFICI AVANZATI (Doppia Scala Y) ---
+    // Aggiornato per accettare parametro dashed2 opzionale
+    initDualLine(label1, color1, label2, color2, dashed2 = true) {
         if (typeof Chart === 'undefined') return;
         const ctx = document.getElementById(this.canvasId).getContext('2d');
         this.type = 'dual-line';
@@ -127,7 +128,7 @@ export class ChartComponent {
                     label: label2, 
                     data: [], 
                     borderColor: color2,
-                    borderDash: [5, 5], 
+                    borderDash: dashed2 ? [5, 5] : [], 
                     yAxisID: 'y1', 
                     borderWidth: 2, 
                     pointRadius: 0, 
@@ -177,18 +178,31 @@ export class ChartComponent {
         } 
         else if (this.type === 'dual-line') {
             // data1: array livePoints completo
-            // Dataset 0: W' Balance
-            this.chart.data.datasets[0].data = data1.map(p => ({ 
-                x: p.distanceKm, 
-                y: p.wPrimeBal 
-            }));
             
-            // Dataset 1: Efficiency
-            // Filtriamo valori nulli o infiniti
-            this.chart.data.datasets[1].data = data1.map(p => ({ 
-                x: p.distanceKm, 
-                y: p.efficiency 
-            })).filter(pt => pt.y !== null && isFinite(pt.y));
+            // Logica generica: se vengono passati gli estrattori, usiamo quelli
+            if (typeof extractor1 === 'function' && typeof extractor2 === 'function') {
+                this.chart.data.datasets[0].data = data1.map(p => ({ 
+                    x: p.distanceKm, 
+                    y: extractor1(p) 
+                })).filter(pt => pt.y !== null && isFinite(pt.y));
+                
+                this.chart.data.datasets[1].data = data1.map(p => ({ 
+                    x: p.distanceKm, 
+                    y: extractor2(p) 
+                })).filter(pt => pt.y !== null && isFinite(pt.y));
+            } 
+            else {
+                // Fallback Legacy (W' Balance / Efficiency) per compatibilità se non passati argomenti
+                this.chart.data.datasets[0].data = data1.map(p => ({ 
+                    x: p.distanceKm, 
+                    y: p.wPrimeBal 
+                }));
+                
+                this.chart.data.datasets[1].data = data1.map(p => ({ 
+                    x: p.distanceKm, 
+                    y: p.efficiency 
+                })).filter(pt => pt.y !== null && isFinite(pt.y));
+            }
         }
         else {
             // --- STANDARD LINE CHART ---
