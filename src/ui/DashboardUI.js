@@ -163,8 +163,6 @@ export class DashboardUI {
                 </div>
 
             </div>
-            
-            <div class="ltp-footer">LiveTrackPro Active Interface v2.1</div>
         `;
         document.body.appendChild(container);
     }

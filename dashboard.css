@@ -144,12 +144,3 @@ body {
     box-sizing: border-box;
     position: relative; 
 }
-
-/* --- FOOTER --- */
-.ltp-footer { 
-    text-align: center; 
-    color: #aaa; 
-    font-size: 11px; 
-    margin-top: 30px; 
-    margin-bottom: 20px;
-}

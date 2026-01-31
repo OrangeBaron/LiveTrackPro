@@ -24,17 +24,18 @@ export class DataManager {
     }
 
     notify() {
-        if (this.hasReceivedCourses && this.hasReceivedLive) {
-            this.listeners.forEach(cb => cb({
-                live: this.livePoints,
-                course: this.coursePoints,
-                // Nuovi payload per i grafici avanzati
-                wPrime: this.livePoints.map(p => ({ x: p.distanceKm, y: p.wPrimeBal })),
-                efficiency: this.livePoints.map(p => ({ x: p.distanceKm, y: p.efficiency })),
-                zones: this.timeInZones
-            }));
-        }
+    if (this.hasReceivedLive) {
+        this.listeners.forEach(cb => cb({
+            live: this.livePoints,
+            course: this.coursePoints, // Sarà un array vuoto [] se non ancora ricevuto
+            
+            // Payload per grafici avanzati
+            wPrime: this.livePoints.map(p => ({ x: p.distanceKm, y: p.wPrimeBal })),
+            efficiency: this.livePoints.map(p => ({ x: p.distanceKm, y: p.efficiency })),
+            zones: this.timeInZones
+        }));
     }
+}
 
     // Gestione Traccia Pianificata (Course)
     ingestCourse(data) {

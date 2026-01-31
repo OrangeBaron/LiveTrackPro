@@ -13,30 +13,30 @@ window.fetch = function(...args) {
     try {
         const url = (typeof args[0] === 'string') ? args[0] : (args[0]?.url || '');
         
-        // Gestione Course
+        // --- Gestione Course ---
         if (url.includes('courses')) {
             responsePromise.then(res => {
                 if (res.ok) {
                     res.clone().json()
                         .then(data => {
                             dataManager.ingestCourse(data);
-                            if (dataManager.hasReceivedCourses && dataManager.hasReceivedLive && !dashboard.isInitialized) {
-                                dashboard.bootstrap();
-                            }
+                            // Se l'interfaccia è già attiva, ingestCourse() chiamerà notify() 
                         })
                         .catch(e => console.warn("LiveTrackPro: Course parse error", e));
                 }
             }).catch(() => {});
         }
 
-        // Gestione Live Track
+        // --- Gestione Live Track ---
         if (url.includes('track-points/common')) {
             responsePromise.then(res => {
                 if (res.ok) {
                     res.clone().json()
                         .then(data => {
                             dataManager.ingestLive(data);
-                            if (dataManager.hasReceivedCourses && dataManager.hasReceivedLive && !dashboard.isInitialized) {
+                            
+                            // Se abbiamo i dati live e la dashboard non è ancora visibile, la avviamo.
+                            if (dataManager.hasReceivedLive && !dashboard.isInitialized) {
                                 dashboard.bootstrap();
                             }
                         })
