@@ -1,165 +1,125 @@
 import { CONFIG } from '../config.js';
 
 export class ChartComponent {
-    /**
-     * @param {string} canvasId - ID del canvas HTML
-     * @param {string} label - Etichetta principale del dataset
-     * @param {string} color - Colore principale
-     * @param {string} type - Tipo di grafico: 'line', 'bar', 'dual-line'
-     */
-    constructor(canvasId, label, color, type = 'line') {
+    constructor(canvasId, label, color, type = 'line', options = {}) {
         this.canvasId = canvasId;
         this.label = label;
         this.color = color;
         this.type = type;
         this.chart = null;
+        // Opzioni extra per dual-line (es. label asse destro, colori)
+        this.extraOptions = options; 
     }
 
     init() {
         if (typeof Chart === 'undefined') return;
         const ctx = document.getElementById(this.canvasId).getContext('2d');
         
-        // Opzioni comuni per tutti i grafici
-        const commonOptions = {
+        // Configurazione Base condivisa
+        const commonConfig = {
             responsive: true, 
             maintainAspectRatio: false, 
             animation: false,
-            scales: { 
-                x: { grid: { display: false } }, 
-                y: { grid: { color: '#f0f0f0' }, beginAtZero: true } 
-            },
-            plugins: {
-                tooltip: { mode: 'index', intersect: false }
-            }
+            interaction: { mode: 'index', intersect: false },
+            scales: { x: { grid: { display: false } } }
         };
 
-        if (this.type === 'bar') {
-            // --- ISTOGRAMMA (Zone HR) ---
-            this.chart = new Chart(ctx, {
-                type: 'bar',
-                data: { 
-                    labels: ['Z1', 'Z2', 'Z3', 'Z4', 'Z5'],
-                    datasets: [{
-                        label: this.label,
-                        data: [0, 0, 0, 0, 0],
-                        backgroundColor: [
-                            '#3498db', // Z1 - Blu
-                            '#2ecc71', // Z2 - Verde
-                            '#f1c40f', // Z3 - Giallo
-                            '#e67e22', // Z4 - Arancio
-                            '#e74c3c'  // Z5 - Rosso
-                        ],
-                        borderRadius: 4
-                    }]
-                },
-                options: {
-                    ...commonOptions,
-                    plugins: { legend: { display: false } }
-                }
-            });
-        } else {
-            // --- LINE CHART STANDARD (Elevation, Speed) ---
-            // Creiamo sempre due dataset: uno per la traccia prevista (background) e uno per la live
-            this.chart = new Chart(ctx, {
-                type: 'line',
-                data: { datasets: [
-                    // Dataset 0: Course (Previsto - Background)
-                    {
-                        label: 'Previsto',
-                        data: [],
-                        borderColor: CONFIG.colors.chartSecondary || '#ccc',
-                        borderWidth: 1,
-                        pointRadius: 0,
-                        borderDash: [5, 5],
-                        fill: false,
-                        tension: 0.1,
-                        order: 2
-                    },
-                    // Dataset 1: Live (Attuale - Foreground)
-                    {
-                        label: this.label,
-                        data: [],
-                        borderColor: this.color,
-                        backgroundColor: this.color + '33', // Opacità 20%
-                        borderWidth: 2, 
-                        pointRadius: 0, 
-                        fill: true, 
-                        tension: 0.2,
-                        order: 1
-                    }
-                ]},
-                options: {
-                    ...commonOptions,
-                    scales: { 
-                        ...commonOptions.scales, 
-                        x: { type: 'linear', min: 0, grid: { display: false } } 
-                    },
-                    interaction: { mode: 'nearest', axis: 'x', intersect: false },
-                    plugins: { 
-                        legend: { display: false }
-                    }
-                }
-            });
+        // SWITCH centrale per tipo di grafico
+        switch (this.type) {
+            case 'bar':
+                this._initBarChart(ctx, commonConfig);
+                break;
+            case 'dual-line':
+                this._initDualLineChart(ctx, commonConfig);
+                break;
+            case 'line':
+            default:
+                this._initStandardLineChart(ctx, commonConfig);
+                break;
         }
     }
 
-    // --- METODO SPECIALE PER GRAFICI AVANZATI (Doppia Scala Y) ---
-    // Aggiornato per accettare parametro dashed2 opzionale
-    initDualLine(label1, color1, label2, color2, dashed2 = true) {
-        if (typeof Chart === 'undefined') return;
-        const ctx = document.getElementById(this.canvasId).getContext('2d');
-        this.type = 'dual-line';
+    // --- Sotto-metodi di inizializzazione (Privati per convenzione) ---
+
+    _initBarChart(ctx, config) {
+        this.chart = new Chart(ctx, {
+            type: 'bar',
+            data: { 
+                labels: ['Z1', 'Z2', 'Z3', 'Z4', 'Z5'],
+                datasets: [{
+                    label: this.label,
+                    data: [0, 0, 0, 0, 0],
+                    backgroundColor: ['#3498db', '#2ecc71', '#f1c40f', '#e67e22', '#e74c3c'],
+                    borderRadius: 4
+                }]
+            },
+            options: { ...config, plugins: { legend: { display: false } } }
+        });
+    }
+
+    _initStandardLineChart(ctx, config) {
+        this.chart = new Chart(ctx, {
+            type: 'line',
+            data: { datasets: [
+                {
+                    label: 'Previsto',
+                    data: [],
+                    borderColor: CONFIG.colors.chartSecondary || '#ccc',
+                    borderWidth: 1, pointRadius: 0, borderDash: [5, 5],
+                    fill: false, tension: 0.1
+                },
+                {
+                    label: this.label,
+                    data: [],
+                    borderColor: this.color,
+                    backgroundColor: this.color + '33',
+                    borderWidth: 2, pointRadius: 0, 
+                    fill: true, tension: 0.2
+                }
+            ]},
+            options: {
+                ...config,
+                scales: { ...config.scales, x: { type: 'linear', min: 0, grid: { display: false } } },
+                plugins: { legend: { display: false } }
+            }
+        });
+    }
+
+    _initDualLineChart(ctx, config) {
+        // Recupera opzioni specifiche passate nel costruttore
+        const { label2, color2, dashed2 } = this.extraOptions;
 
         this.chart = new Chart(ctx, {
             type: 'line',
             data: { datasets: [
                 {
-                    label: label1, 
-                    data: [], 
-                    borderColor: color1,
-                    backgroundColor: color1 + '11', // Molto leggero
-                    yAxisID: 'y', 
-                    borderWidth: 2, 
-                    pointRadius: 0, 
-                    tension: 0.2,
-                    fill: true
+                    label: this.label, // Asse SX
+                    borderColor: this.color,
+                    backgroundColor: this.color + '11',
+                    yAxisID: 'y', borderWidth: 2, pointRadius: 0, tension: 0.2, fill: true,
+                    data: []
                 },
                 {
-                    label: label2, 
-                    data: [], 
-                    borderColor: color2,
-                    borderDash: dashed2 ? [5, 5] : [], 
-                    yAxisID: 'y1', 
-                    borderWidth: 2, 
-                    pointRadius: 0, 
-                    tension: 0.2,
-                    fill: false
+                    label: label2 || 'Secondary', // Asse DX
+                    borderColor: color2 || '#000',
+                    borderDash: dashed2 ? [5, 5] : [],
+                    yAxisID: 'y1', borderWidth: 2, pointRadius: 0, tension: 0.2, fill: false,
+                    data: []
                 }
             ]},
             options: {
-                responsive: true, 
-                maintainAspectRatio: false, 
-                animation: false,
-                interaction: { mode: 'index', intersect: false },
+                ...config,
                 plugins: { legend: { display: true } },
                 scales: {
-                    x: { 
-                        type: 'linear', 
-                        min: 0,
-                        grid: { display: false }
-                    },
+                    x: { type: 'linear', min: 0, grid: { display: false } },
                     y: { 
-                        type: 'linear', 
-                        display: true, 
-                        position: 'left', 
-                        title: { display: true, text: label1 },
+                        type: 'linear', display: true, position: 'left', 
+                        title: { display: true, text: this.label },
                         grid: { color: '#f0f0f0' }
                     },
                     y1: { 
-                        type: 'linear', 
-                        display: true, 
-                        position: 'right', 
-                        grid: { drawOnChartArea: false }, 
+                        type: 'linear', display: true, position: 'right', 
+                        grid: { drawOnChartArea: false },
                         title: { display: true, text: label2 } 
                     }
                 }
@@ -167,59 +127,39 @@ export class ChartComponent {
         });
     }
 
-    update(data1, data2OrExtractor, extractor1, extractor2) {
+    // --- Metodo Update Unificato ---
+    update(dataMain, dataSecondary, extractorMain, extractorSecondary) {
         if (!this.chart) return;
 
         if (this.type === 'bar') {
-            // data1: array di secondi per zona
-            // Convertiamo in minuti per leggibilità
-            const minutes = data1.map(s => (s / 60).toFixed(1));
+            // dataMain qui è l'array delle zone (secondi)
+            const minutes = (Array.isArray(dataMain) ? dataMain : []).map(s => (s / 60).toFixed(1));
             this.chart.data.datasets[0].data = minutes;
-        } 
-        else if (this.type === 'dual-line') {
-            // data1: array livePoints completo
-            
-            // Logica generica: se vengono passati gli estrattori, usiamo quelli
-            if (typeof extractor1 === 'function' && typeof extractor2 === 'function') {
-                this.chart.data.datasets[0].data = data1.map(p => ({ 
-                    x: p.distanceKm, 
-                    y: extractor1(p) 
-                })).filter(pt => pt.y !== null && isFinite(pt.y));
-                
-                this.chart.data.datasets[1].data = data1.map(p => ({ 
-                    x: p.distanceKm, 
-                    y: extractor2(p) 
-                })).filter(pt => pt.y !== null && isFinite(pt.y));
-            } 
-            else {
-                // Fallback Legacy (W' Balance / Efficiency) per compatibilità se non passati argomenti
-                this.chart.data.datasets[0].data = data1.map(p => ({ 
-                    x: p.distanceKm, 
-                    y: p.wPrimeBal 
-                }));
-                
-                this.chart.data.datasets[1].data = data1.map(p => ({ 
-                    x: p.distanceKm, 
-                    y: p.efficiency 
-                })).filter(pt => pt.y !== null && isFinite(pt.y));
-            }
+            this.chart.update();
+            return;
         }
-        else {
-            // --- STANDARD LINE CHART ---
-            
-            const toXY = (points, extractor) => points.map(p => ({
-                x: (p.totalDistanceMeters || 0) / 1000,
+
+        // Helper per mappare i punti {x, y}
+        const mapData = (points, extractor) => {
+            if (!points || !extractor) return [];
+            return points.map(p => ({
+                x: (p.distanceKm !== undefined) ? p.distanceKm : (p.totalDistanceMeters || 0) / 1000,
                 y: extractor(p)
-            })).filter(pt => pt.y !== null && !isNaN(pt.y));
+            })).filter(pt => pt.y !== null && isFinite(pt.y));
+        };
 
-            // Aggiorna Live Track (Dataset 1)
-            this.chart.data.datasets[1].data = toXY(data1, extractor1);
-
-            // Aggiorna Course Track (Dataset 0) se disponibile
-            // data2OrExtractor: array coursePoints
-            // extractor2: funzione estrattore per course
-            if (Array.isArray(data2OrExtractor) && data2OrExtractor.length > 0) {
-                 this.chart.data.datasets[0].data = toXY(data2OrExtractor, extractor2);
+        // Aggiornamento Dataset
+        if (this.type === 'dual-line') {
+            // Dual Line: Dataset 0 (Main), Dataset 1 (Secondary) - Entrambi basati su dataMain (livePoints)
+            this.chart.data.datasets[0].data = mapData(dataMain, extractorMain);
+            this.chart.data.datasets[1].data = mapData(dataMain, extractorSecondary);
+        } else {
+            // Standard Line: Dataset 1 (Main/Live), Dataset 0 (Secondary/Course)
+            this.chart.data.datasets[1].data = mapData(dataMain, extractorMain);
+            // Il course ha spesso una struttura diversa, gestiamola se serve, 
+            // ma usando lo stesso helper se i nomi delle prop coincidono o tramite extractor.
+            if (dataSecondary && extractorSecondary) {
+                this.chart.data.datasets[0].data = mapData(dataSecondary, extractorSecondary);
             }
         }
         

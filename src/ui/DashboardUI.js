@@ -13,11 +13,34 @@ export class DashboardUI {
         this.speedChart = new ChartComponent('speed-chart', 'Velocità (km/h)', CONFIG.colors.chartPrimary);
         
         // --- COLONNA 2 ---
-        // Grafico Potenza e Cuore
-        this.powerHrChart = new ChartComponent('power-hr-chart', '', '', 'dual-line');
+        
+        // 1. Grafico Power & HR
+        this.powerHrChart = new ChartComponent(
+            'power-hr-chart', 
+            'Power (W)', 
+            '#e67e22',
+            'dual-line',
+            { 
+                label2: 'Heart Rate (bpm)', 
+                color2: '#e74c3c',
+                dashed2: false 
+            }
+        );
 
-        // 'dual-line' e 'bar' sono i tipi gestiti da ChartComponent
-        this.advancedChart = new ChartComponent('advanced-chart', '', '', 'dual-line'); 
+        // 2. Grafico W' Balance & Efficiency
+        this.advancedChart = new ChartComponent(
+            'advanced-chart', 
+            "W' Balance (J)", 
+            CONFIG.colors.wPrime, 
+            'dual-line',
+            { 
+                label2: 'Efficiency (Pw/HR)', 
+                color2: CONFIG.colors.efficiency, 
+                dashed2: true 
+            }
+        ); 
+        
+        // 3. Grafico Zone
         this.zonesChart = new ChartComponent('zones-chart', 'Tempo in Zona (min)', '', 'bar');
     }
 
@@ -34,26 +57,9 @@ export class DashboardUI {
         this.speedChart.init();
         
         // Inizializzazione Componenti Colonna 2
-        
-        // 1. Grafico Power & HR
-        this.powerHrChart.initDualLine(
-            "Power (W)", 
-            "#e67e22", // Arancio
-            "Heart Rate (bpm)", 
-            "#e74c3c", // Rosso
-            false // Linea continua per HR
-        );
-
-        // 2. Grafico W' Balance & Efficiency
-        this.advancedChart.initDualLine(
-            "W' Balance (J)", 
-            CONFIG.colors.wPrime, 
-            "Efficiency (Pw/HR)", 
-            CONFIG.colors.efficiency,
-            true // Linea tratteggiata per Efficiency
-        );
-        
-        this.zonesChart.init(); // Si inizializza come bar chart
+        this.powerHrChart.init();
+        this.advancedChart.init();
+        this.zonesChart.init(); 
         
         // Sottoscrizione ai dati
         this.dataManager.subscribe(data => this.refresh(data));
@@ -216,16 +222,13 @@ export class DashboardUI {
         );
 
         // 4. Aggiornamento Colonna 2
-        
-        // Aggiorniamo il nuovo grafico Power/HR passando gli estrattori specifici
         this.powerHrChart.update(
             live,
             null,
-            p => p.powerWatts,           // Dataset 0 (Left Axis)
-            p => p.heartRateBeatsPerMin  // Dataset 1 (Right Axis)
+            p => p.powerWatts,           // Dataset 0
+            p => p.heartRateBeatsPerMin  // Dataset 1
         );
 
-        // Aggiorniamo il grafico W'/Efficiency passando gli estrattori specifici
         this.advancedChart.update(
             live, 
             null,
