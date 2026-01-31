@@ -1,8 +1,8 @@
-# 🚴‍♂️ LiveTrackPro
+# 🚴‍♂️ Live Track Pro
 
 > **Stato del progetto:** 🚧 *Work in Progress (Alpha)* > **Obiettivo:** Creare la dashboard di telemetria definitiva per il ciclismo.
 
-**LiveTrackPro** è un'estensione per browser (Chrome/Edge) progettata per sovrapporsi e sostituire l'interfaccia standard di **Garmin LiveTrack**.
+**Live Track Pro** è un'estensione per browser (Chrome/Edge) progettata per sovrapporsi e sostituire l'interfaccia standard di **Garmin LiveTrack**.
 
 L'obiettivo è trasformare una semplice mappa di tracciamento in una **dashboard professionale di analisi in tempo reale**, offrendo metriche avanzate solitamente disponibili solo post-attività su software come GoldenCheetah o TrainingPeaks.
 
@@ -68,4 +68,4 @@ Il progetto è in attiva evoluzione. I prossimi passi includono:
 
 ---
 
-*LiveTrackPro non è affiliato con Garmin Ltd. Questo è un progetto open-source sviluppato da appassionati per appassionati.*
+*Live Track Pro non è affiliato con Garmin Ltd. Questo è un progetto open-source sviluppato da appassionati per appassionati.*

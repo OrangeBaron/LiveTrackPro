@@ -6,19 +6,23 @@
   "icons": {
     "256": "icon.png"
   },
+  "permissions": [
+    "storage" 
+  ],
+  "options_ui": {
+    "page": "src/options/options.html",
+    "open_in_tab": true
+  },
   "host_permissions": [
     "https://livetrack.garmin.com/*"
   ],
   "web_accessible_resources": [
     {
       "resources": [
-        "src/main.js", 
-        "src/config.js", 
-        "src/utils.js", 
-        "src/managers/DataManager.js", 
-        "src/components/MapComponent.js", 
-        "src/components/ChartComponent.js", 
-        "src/ui/DashboardUI.js"
+        "src/*",
+        "src/components/*",
+        "src/managers/*",
+        "src/ui/*"
       ],
       "matches": ["<all_urls>"]
     }

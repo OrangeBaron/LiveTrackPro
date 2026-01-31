@@ -7,16 +7,16 @@ export class DashboardUI {
         this.dataManager = dataManager;
         this.isInitialized = false;
         
-        // --- COLONNA 1 (Geografica/Fisica) ---
+        // --- COLONNA 1 ---
         this.mapComponent = new MapComponent('map-container');
         this.elevationChart = new ChartComponent('elevation-chart', 'Altitudine (m)', CONFIG.colors.chartPrimary);
         this.speedChart = new ChartComponent('speed-chart', 'Velocità (km/h)', CONFIG.colors.chartPrimary);
         
-        // --- COLONNA 2 (Fisiologica/Avanzata) ---
-        // Nuovo Grafico: Potenza e Cuore
+        // --- COLONNA 2 ---
+        // Grafico Potenza e Cuore
         this.powerHrChart = new ChartComponent('power-hr-chart', '', '', 'dual-line');
 
-        // 'dual-line' e 'bar' sono i tipi gestiti dal nuovo ChartComponent
+        // 'dual-line' e 'bar' sono i tipi gestiti da ChartComponent
         this.advancedChart = new ChartComponent('advanced-chart', '', '', 'dual-line'); 
         this.zonesChart = new ChartComponent('zones-chart', 'Tempo in Zona (min)', '', 'bar');
     }
@@ -35,13 +35,13 @@ export class DashboardUI {
         
         // Inizializzazione Componenti Colonna 2
         
-        // 1. Nuovo Grafico Power & HR
+        // 1. Grafico Power & HR
         this.powerHrChart.initDualLine(
             "Power (W)", 
-            "#e67e22", // Arancio (Uso codici hardcoded per coerenza con CSS)
+            "#e67e22", // Arancio
             "Heart Rate (bpm)", 
             "#e74c3c", // Rosso
-            false      // False = Linea continua (non tratteggiata) per HR
+            false // Linea continua per HR
         );
 
         // 2. Grafico W' Balance & Efficiency
@@ -50,10 +50,10 @@ export class DashboardUI {
             CONFIG.colors.wPrime, 
             "Efficiency (Pw/HR)", 
             CONFIG.colors.efficiency,
-            true       // True = Linea tratteggiata per Efficiency
+            true // Linea tratteggiata per Efficiency
         );
         
-        this.zonesChart.init(); // Si inizializza come bar chart (definito nel costruttore)
+        this.zonesChart.init(); // Si inizializza come bar chart
         
         // Sottoscrizione ai dati
         this.dataManager.subscribe(data => this.refresh(data));
@@ -61,7 +61,7 @@ export class DashboardUI {
         this.isInitialized = true;
         console.log("LiveTrackPro: UI Loaded & Ready.");
 
-        // Recupero dati pregressi se esistenti (fix race condition)
+        // Recupero dati pregressi se esistenti
         if (this.dataManager.hasReceivedLive) {
             this.dataManager.notify(); // Forza un refresh immediato
         }
@@ -184,7 +184,11 @@ export class DashboardUI {
         const lastPoint = live[live.length - 1];
 
         // 1. Aggiornamento Header Info
-        const timeStr = lastPoint.dateTime.split('T')[1].replace('Z', '').split('.')[0]; // HH:MM:SS
+        const timeStr = new Date(lastPoint.dateTime).toLocaleTimeString([], { 
+            hour: '2-digit', 
+            minute: '2-digit', 
+            second: '2-digit' 
+        });
         document.getElementById('status-log').innerHTML = 
             `<strong>UPDATED:</strong> ${timeStr} &bull; <strong>PTS:</strong> ${live.length}`;
 
@@ -194,7 +198,7 @@ export class DashboardUI {
         this.updateTextMetric('live-cadence', lastPoint.cadenceCyclesPerMin || '-');
         this.updateTextMetric('live-hr', lastPoint.heartRateBeatsPerMin || '-');
 
-        // 3. Aggiornamento Colonna 1 (Standard)
+        // 3. Aggiornamento Colonna 1
         this.mapComponent.update(live, course);
         
         this.elevationChart.update(
@@ -211,7 +215,7 @@ export class DashboardUI {
             null
         );
 
-        // 4. Aggiornamento Colonna 2 (Advanced)
+        // 4. Aggiornamento Colonna 2
         
         // Aggiorniamo il nuovo grafico Power/HR passando gli estrattori specifici
         this.powerHrChart.update(
@@ -222,7 +226,6 @@ export class DashboardUI {
         );
 
         // Aggiorniamo il grafico W'/Efficiency passando gli estrattori specifici
-        // (necessario ora che abbiamo reso la logica generica)
         this.advancedChart.update(
             live, 
             null,
@@ -230,7 +233,7 @@ export class DashboardUI {
             p => p.efficiency // Dataset 1
         ); 
         
-        // Passiamo l'array accumulatore delle zone (secondi)
+        // Passiamo l'array accumulatore delle zone
         this.zonesChart.update(zones);
     }
 
