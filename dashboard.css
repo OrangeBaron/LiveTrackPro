@@ -116,12 +116,16 @@ body {
 }
 
 /* Desktop View: Attiva le due colonne affiancate */
-@media (min-width: 1200px) {
+@media (min-width: 960px) {
     .ltp-content-grid {
         display: grid;
         grid-template-columns: 1fr 1fr;
         gap: 20px;
         align-items: start;
+    }
+
+    .ltp-column {
+        min-width: 0;
     }
 }
 
