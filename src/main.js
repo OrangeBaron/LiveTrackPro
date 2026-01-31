@@ -10,7 +10,7 @@ const dashboard = new DashboardUI(dataManager);
 let capturedCsrfToken = null;
 let historyFetched = false;
 
-// --- FUNZIONE DI RECUPERO STORICO (Dal tuo script.js) ---
+// --- FUNZIONE DI RECUPERO STORICO ---
 async function forceHistoryFetch(tokenCsrf) {
     if (historyFetched) return; // Eseguiamo una volta sola
     historyFetched = true;
@@ -92,7 +92,7 @@ window.fetch = function(...args) {
 
         if (token) {
             capturedCsrfToken = token;
-            console.log("✅ LiveTrackPro: CSRF Token catturato:", token);
+            console.log("LiveTrackPro: CSRF Token catturato:", token);
             // Appena abbiamo il token, lanciamo il fetch dello storico
             forceHistoryFetch(token); 
         }
@@ -100,7 +100,7 @@ window.fetch = function(...args) {
 
     const responsePromise = window.originalFetch.apply(this, args);
     
-    // 2. ANALISI DELLA RISPOSTA (Logica esistente)
+    // 2. ANALISI DELLA RISPOSTA
     try {
         const url = (typeof args[0] === 'string') ? args[0] : (args[0]?.url || '');
         
@@ -117,7 +117,7 @@ window.fetch = function(...args) {
             }).catch(() => {});
         }
 
-        // --- Gestione Live Track (Polling standard) ---
+        // --- Gestione Live Track ---
         if (url.includes('track-points/common')) {
             responsePromise.then(res => {
                 if (res.ok) {
