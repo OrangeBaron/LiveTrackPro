@@ -31,6 +31,7 @@ export class DataManager {
         this.timeInPowerZones = [0, 0, 0, 0, 0, 0, 0];  
         this.normalizedPower = 0;
         this.intensityFactor = 0;
+        this.tss = 0;
     }
 
     subscribe(callback) {
@@ -67,6 +68,7 @@ export class DataManager {
                 workKj: Math.round(this.totalWorkJ / 1000),
                 np: Math.round(this.normalizedPower),
                 if: this.intensityFactor.toFixed(2),
+                tss: Math.round(this.tss),
                 vam: lastPoint.vam || 0,
                 gradient: lastPoint.gradient || 0,
                 weather: this.weatherManager.current
@@ -206,6 +208,12 @@ export class DataManager {
         // Finalize Statistiche Globali
         if (rollingPowerCount > 0) this.normalizedPower = Math.pow(rollingPowerSum4 / rollingPowerCount, 0.25);
         this.intensityFactor = (cp > 0) ? this.normalizedPower / cp : 0;
+        if (sortedPoints.length > 0 && cp > 0) {
+            const startTime = new Date(sortedPoints[0].dateTime).getTime();
+            const endTime = new Date(sortedPoints[sortedPoints.length - 1].dateTime).getTime();
+            const durationSeconds = (endTime - startTime) / 1000;
+            this.tss = (durationSeconds * this.normalizedPower * this.intensityFactor) / (cp * 3600) * 100;
+        }
         this.livePoints = sortedPoints;
 
         // Trigger Meteo

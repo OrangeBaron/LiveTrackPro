@@ -4,15 +4,15 @@
 
 **Live Track Pro** è un'estensione per browser progettata per sovrapporsi e potenziare l'interfaccia standard di **Garmin LiveTrack**.
 
-Trasforma la semplice mappa di tracciamento in una vera e propria **plancia di analisi in tempo reale** (stile ammiraglia), offrendo metriche professionali come Potenza Normalizzata, VAM, W' Balance e dati Meteo, solitamente disponibili solo post-attività.
+Trasforma la semplice mappa di tracciamento in una vera e propria **plancia di analisi in tempo reale** (stile ammiraglia), offrendo metriche professionali come TSS, Potenza Normalizzata, VAM, W' Balance e dati Meteo, solitamente disponibili solo post-attività.
 
 ## ✨ Funzionalità
 
 Il sistema intercetta i dati grezzi dal dispositivo Garmin ed esegue calcoli complessi direttamente nel browser per visualizzare:
 
-### ⚡ Power & Energy Analytics
+### ⚡️ Power & Energy Analytics
 
-* **Metriche di Carico:** Calcolo in tempo reale di **NP** (Normalized Power), **IF** (Intensity Factor) e **Total Work** (kJ bruciati).
+* **Metriche di Carico:** Calcolo in tempo reale di **NP** (Normalized Power), **IF** (Intensity Factor) **TSS** (Training Stress Score) e **Total Work** (kJ).
 * **W' Balance:** Modello matematico (Skiba) della "batteria" anaerobica residua (Joule).
 * **Efficienza:** Monitoraggio istantaneo del rapporto Potenza/Cuore (Decoupling).
 * **Zone Distribution:** Doppio istogramma dinamico per analizzare il tempo trascorso nelle **7 Zone di Potenza** (Coggan) e nelle **5 Zone Cardiache** (Friel).

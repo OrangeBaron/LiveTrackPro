@@ -169,6 +169,7 @@ export class DashboardUI {
             this.createSummaryItem('elevation', 'Ascent', 'm'),
             this.createSummaryItem('np', 'Norm. Pwr', 'W'),
             this.createSummaryItem('if', 'Intensity', 'IF'),
+            this.createSummaryItem('tss', 'TSS', 'pts'),
             this.createSummaryItem('work', 'Work', 'kJ'),
             this.createSummaryItem('weather', 'Live Weather', '')
         ].join('');
@@ -236,6 +237,7 @@ export class DashboardUI {
             this.updateTextMetric('summary-elevation', stats.elevationGain ? `+${Math.round(stats.elevationGain)}` : '0');
             this.updateTextMetric('summary-np', stats.np || '-');
             this.updateTextMetric('summary-if', stats.if || '-');
+            this.updateTextMetric('summary-tss', stats.tss || '0');
             this.updateTextMetric('summary-work', stats.workKj || '-');
 
             // Meteo
