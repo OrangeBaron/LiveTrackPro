@@ -2,7 +2,8 @@
 chrome.storage.sync.get({
     cp: 280,
     wPrime: 20000,
-    hrZones: [135, 150, 165, 178, 200]
+    hrZones: [135, 150, 165, 178, 200],
+    owmKey: ''
 }, (items) => {
     
     // 1. Inietta le configurazioni in un elemento DOM sicuro

@@ -14,7 +14,8 @@
     "open_in_tab": true
   },
   "host_permissions": [
-    "https://livetrack.garmin.com/*"
+    "https://livetrack.garmin.com/*",
+    "https://api.openweathermap.org/*"
   ],
   "web_accessible_resources": [
     {

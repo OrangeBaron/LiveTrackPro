@@ -1,4 +1,3 @@
-// Recupero delle impostazioni
 let USER_SETTINGS = {};
 
 try {
@@ -12,8 +11,9 @@ try {
 }
 
 export const CONFIG = {
-    // URL per i tile della mappa
     mapUrl: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+
+    weatherApiKey: USER_SETTINGS.owmKey || null,
 
     libs: [
         'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
@@ -32,7 +32,6 @@ export const CONFIG = {
         efficiency: '#27ae60'
     },
 
-    // Dati Atleta
     athlete: {
         cp: parseInt(USER_SETTINGS.cp) || 280, 
         wPrime: parseInt(USER_SETTINGS.wPrime) || 20000, 

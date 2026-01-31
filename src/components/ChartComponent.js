@@ -7,7 +7,6 @@ export class ChartComponent {
         this.color = color;
         this.type = type;
         this.chart = null;
-        // Opzioni extra per dual-line (es. label asse destro, colori)
         this.extraOptions = options; 
     }
 
@@ -15,7 +14,6 @@ export class ChartComponent {
         if (typeof Chart === 'undefined') return;
         const ctx = document.getElementById(this.canvasId).getContext('2d');
         
-        // Configurazione Base condivisa
         const commonConfig = {
             responsive: true, 
             maintainAspectRatio: false, 
@@ -24,7 +22,6 @@ export class ChartComponent {
             scales: { x: { grid: { display: false } } }
         };
 
-        // SWITCH centrale per tipo di grafico
         switch (this.type) {
             case 'bar':
                 this._initBarChart(ctx, commonConfig);
@@ -39,21 +36,39 @@ export class ChartComponent {
         }
     }
 
-    // --- Sotto-metodi di inizializzazione (Privati per convenzione) ---
-
     _initBarChart(ctx, config) {
+        // Recuperiamo le opzioni con fallback
+        const labels = this.extraOptions.labels || ['Z1', 'Z2', 'Z3', 'Z4', 'Z5'];
+        const colors = this.extraOptions.barColors || ['#3498db', '#2ecc71', '#f1c40f', '#e67e22', '#e74c3c'];
+
+        // Creiamo un array di zeri lungo quanto le labels
+        const initialData = new Array(labels.length).fill(0);
+
         this.chart = new Chart(ctx, {
             type: 'bar',
             data: { 
-                labels: ['Z1', 'Z2', 'Z3', 'Z4', 'Z5'],
+                labels: labels,
                 datasets: [{
                     label: this.label,
-                    data: [0, 0, 0, 0, 0],
-                    backgroundColor: ['#3498db', '#2ecc71', '#f1c40f', '#e67e22', '#e74c3c'],
+                    data: initialData,
+                    backgroundColor: colors,
                     borderRadius: 4
                 }]
             },
-            options: { ...config, plugins: { legend: { display: false } } }
+            options: { 
+                ...config, 
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { 
+                        display: false,
+                        grid: { display: false } 
+                    },
+                    x: {
+                        grid: { display: false },
+                        ticks: { font: { size: 10 } }
+                    }
+                }
+            }
         });
     }
 
@@ -86,21 +101,20 @@ export class ChartComponent {
     }
 
     _initDualLineChart(ctx, config) {
-        // Recupera opzioni specifiche passate nel costruttore
         const { label2, color2, dashed2 } = this.extraOptions;
 
         this.chart = new Chart(ctx, {
             type: 'line',
             data: { datasets: [
                 {
-                    label: this.label, // Asse SX
+                    label: this.label, 
                     borderColor: this.color,
                     backgroundColor: this.color + '11',
                     yAxisID: 'y', borderWidth: 2, pointRadius: 0, tension: 0.2, fill: true,
                     data: []
                 },
                 {
-                    label: label2 || 'Secondary', // Asse DX
+                    label: label2 || 'Secondary', 
                     borderColor: color2 || '#000',
                     borderDash: dashed2 ? [5, 5] : [],
                     yAxisID: 'y1', borderWidth: 2, pointRadius: 0, tension: 0.2, fill: false,
@@ -127,19 +141,16 @@ export class ChartComponent {
         });
     }
 
-    // --- Metodo Update Unificato ---
     update(dataMain, dataSecondary, extractorMain, extractorSecondary) {
         if (!this.chart) return;
 
         if (this.type === 'bar') {
-            // dataMain qui è l'array delle zone (secondi)
             const minutes = (Array.isArray(dataMain) ? dataMain : []).map(s => (s / 60).toFixed(1));
             this.chart.data.datasets[0].data = minutes;
             this.chart.update();
             return;
         }
 
-        // Helper per mappare i punti {x, y}
         const mapData = (points, extractor) => {
             if (!points || !extractor) return [];
             return points.map(p => ({
@@ -148,16 +159,11 @@ export class ChartComponent {
             })).filter(pt => pt.y !== null && isFinite(pt.y));
         };
 
-        // Aggiornamento Dataset
         if (this.type === 'dual-line') {
-            // Dual Line: Dataset 0 (Main), Dataset 1 (Secondary) - Entrambi basati su dataMain (livePoints)
             this.chart.data.datasets[0].data = mapData(dataMain, extractorMain);
             this.chart.data.datasets[1].data = mapData(dataMain, extractorSecondary);
         } else {
-            // Standard Line: Dataset 1 (Main/Live), Dataset 0 (Secondary/Course)
             this.chart.data.datasets[1].data = mapData(dataMain, extractorMain);
-            // Il course ha spesso una struttura diversa, gestiamola se serve, 
-            // ma usando lo stesso helper se i nomi delle prop coincidono o tramite extractor.
             if (dataSecondary && extractorSecondary) {
                 this.chart.data.datasets[0].data = mapData(dataSecondary, extractorSecondary);
             }

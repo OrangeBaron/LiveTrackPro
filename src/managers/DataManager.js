@@ -9,9 +9,22 @@ export class DataManager {
         this.coursePoints = [];
         
         // Metriche avanzate (Stato iniziale)
-        this.wPrimeBalance = CONFIG.athlete.wPrime; // Parte dal massimo
-        this.timeInZones = [0, 0, 0, 0, 0];         // 5 Zone (Z1-Z5)
+        this.wPrimeBalance = CONFIG.athlete.wPrime;
         
+        // Accumulatori Zone
+        this.timeInHrZones = [0, 0, 0, 0, 0];           
+        this.timeInPowerZones = [0, 0, 0, 0, 0, 0, 0];  
+        
+        // Accumulatori Totali
+        this.totalElevationGain = 0;
+        this.totalWorkJ = 0;
+        this.normalizedPower = 0;
+        this.intensityFactor = 0;
+
+        // Stato Meteo [NEW]
+        this.weatherState = null; 
+        this.lastWeatherUpdate = 0; // Timestamp
+
         // Stato Ricezione
         this.hasReceivedCourses = false;
         this.hasReceivedLive = false;
@@ -24,23 +37,73 @@ export class DataManager {
     }
 
     notify() {
-    if (this.hasReceivedLive) {
-        this.listeners.forEach(cb => cb({
-            live: this.livePoints,
-            course: this.coursePoints, // Sarà un array vuoto [] se non ancora ricevuto
-            
-            // Payload per grafici avanzati
-            wPrime: this.livePoints.map(p => ({ x: p.distanceKm, y: p.wPrimeBal })),
-            efficiency: this.livePoints.map(p => ({ x: p.distanceKm, y: p.efficiency })),
-            zones: this.timeInZones
-        }));
-    }
-}
+        if (this.hasReceivedLive) {
+            // Calcolo Durata
+            let durationStr = "00:00:00";
+            if (this.livePoints.length > 0) {
+                const start = new Date(this.livePoints[0].dateTime);
+                const end = new Date(this.livePoints[this.livePoints.length - 1].dateTime);
+                const diffMs = end - start;
+                durationStr = new Date(diffMs).toISOString().substr(11, 8);
+            }
 
-    // Gestione Traccia Pianificata (Course)
+            this.listeners.forEach(cb => cb({
+                live: this.livePoints,
+                course: this.coursePoints,
+                
+                wPrime: this.livePoints.map(p => ({ x: p.distanceKm, y: p.wPrimeBal })),
+                efficiency: this.livePoints.map(p => ({ x: p.distanceKm, y: p.efficiency })),
+                
+                hrZones: this.timeInHrZones,
+                powerZones: this.timeInPowerZones,
+
+                stats: {
+                    duration: durationStr,
+                    elevationGain: this.totalElevationGain,
+                    workKj: Math.round(this.totalWorkJ / 1000),
+                    np: Math.round(this.normalizedPower),
+                    if: this.intensityFactor.toFixed(2),
+                    vam: this.livePoints.length > 0 ? this.livePoints[this.livePoints.length - 1].vam : 0,
+                    gradient: this.livePoints.length > 0 ? this.livePoints[this.livePoints.length - 1].gradient : 0,
+                    weather: this.weatherState // [NEW] Passiamo l'oggetto meteo
+                }
+            }));
+        }
+    }
+
+    // [NEW] Funzione Fetch Meteo (Throttled 15 min)
+    async updateWeather(lat, lon) {
+        if (!CONFIG.weatherApiKey) return;
+        
+        const now = Date.now();
+        // Aggiorna solo se sono passati 15 minuti dall'ultimo update
+        if (now - this.lastWeatherUpdate < 900000) return;
+
+        try {
+            console.log("LiveTrackPro: Fetching weather data...");
+            const res = await fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${CONFIG.weatherApiKey}&units=metric&lang=it`);
+            if (res.ok) {
+                const data = await res.json();
+                this.weatherState = {
+                    temp: Math.round(data.main.temp),
+                    description: data.weather[0].description,
+                    icon: data.weather[0].icon,
+                    windSpeed: Math.round(data.wind.speed * 3.6),
+                    windDeg: data.wind.deg
+                };
+                this.lastWeatherUpdate = now;
+                console.log("LiveTrackPro: Weather updated", this.weatherState);
+                
+                // [IMPORTANTE] Avvisa subito la UI che il meteo è arrivato!
+                this.notify(); 
+            }
+        } catch (e) {
+            console.warn("LiveTrackPro: Weather fetch failed", e);
+        }
+    }
+
     ingestCourse(data) {
         const points = data.geoPoints || data.trackPoints || [];
-        
         this.coursePoints = [];
         let distAccumulator = 0;
 
@@ -62,41 +125,44 @@ export class DataManager {
                 totalDistanceMeters: distAccumulator
             });
         }
-
-        console.log(`LiveTrackPro: Course ingested. Points: ${this.coursePoints.length}`);
         this.hasReceivedCourses = true;
         this.notify();
     }
 
-    // Gestione Traccia Reale (Live)
     ingestLive(data) {
         if (!data.trackPoints || data.trackPoints.length === 0) return;
 
-        // 1. Merge dei dati grezzi nella Map (deduplica per timestamp)
         data.trackPoints.forEach(point => {
-            if (point.dateTime) {
-                this.rawLivePoints.set(point.dateTime, point);
-            }
+            if (point.dateTime) this.rawLivePoints.set(point.dateTime, point);
         });
 
-        // 2. Ordina cronologicamente
         const sortedPoints = Array.from(this.rawLivePoints.values())
             .sort((a, b) => new Date(a.dateTime) - new Date(b.dateTime));
 
-        // 3. Ricalcolo completo delle metriche su tutta la serie storica
-        // (Necessario perché i punti possono arrivare fuori ordine o in batch)
+        // Reset Calcoli
         let distAccumulator = 0;
-        let currentWPrime = CONFIG.athlete.wPrime; // Reset al valore iniziale
-        let zonesAccumulator = [0, 0, 0, 0, 0];    // Reset zone
+        let currentWPrime = CONFIG.athlete.wPrime;
+        
+        this.totalElevationGain = 0;
+        this.totalWorkJ = 0;
+        this.timeInHrZones = [0, 0, 0, 0, 0];
+        this.timeInPowerZones = [0, 0, 0, 0, 0, 0, 0];
+        
+        let rollingPowerSum4 = 0; 
+        let rollingPowerCount = 0;
+        const cp = CONFIG.athlete.cp;
+        const pZones = [0.55, 0.75, 0.90, 1.05, 1.20, 1.50].map(pct => Math.round(cp * pct));
 
         for (let i = 0; i < sortedPoints.length; i++) {
             const p = sortedPoints[i];
+            const pTime = new Date(p.dateTime).getTime();
             
-            // --- A. Calcolo Distanza ---
+            // Logica Distanza
+            let dt = 0; 
             if (i > 0) {
                 const prev = sortedPoints[i - 1];
+                dt = (pTime - new Date(prev.dateTime).getTime()) / 1000;
                 
-                // Distanza geografica
                 if (p.position && prev.position) {
                     const d = getDistanceFromLatLonInMeters(
                         prev.position.lat, prev.position.lon,
@@ -104,65 +170,93 @@ export class DataManager {
                     );
                     distAccumulator += d;
                 }
+                const altDiff = (p.altitude || p.elevation || 0) - (prev.altitude || prev.elevation || 0);
+                if (altDiff > 0) this.totalElevationGain += altDiff;
+            }
 
-                // --- B. Calcolo W' Balance (Algoritmo Integrale) ---
-                const dt = (new Date(p.dateTime) - new Date(prev.dateTime)) / 1000; // Secondi trascorsi
-                const power = p.powerWatts || 0;
+            // Logica 30s Rolling (VAM/Grad)
+            let start30sIdx = i;
+            let sumPower30s = 0;
+            let count30s = 0;
+            
+            for (let j = i; j >= 0; j--) {
+                const pastP = sortedPoints[j];
+                const timeDiff = (pTime - new Date(pastP.dateTime).getTime()) / 1000;
+                sumPower30s += (pastP.powerWatts || 0);
+                count30s++;
+                if (timeDiff >= 30) { start30sIdx = j; break; }
+            }
 
-                if (dt > 0 && dt < 1000) { // Filtra salti temporali assurdi
-                    if (power > CONFIG.athlete.cp) {
-                        // Spesa Energetica (Depletion)
-                        // W' speso = (Potenza - CP) * tempo
-                        currentWPrime -= (power - CONFIG.athlete.cp) * dt;
-                    } else {
-                        // Recupero (Recovery)
-                        // Modello semplificato lineare per real-time: Recupera (CP - Potenza) * dt
-                        // Nota: Esistono modelli esponenziali più complessi (Skiba), ma questo è sufficiente per live tracking.
-                        const recovery = (CONFIG.athlete.cp - power) * dt;
-                        currentWPrime += recovery;
-                    }
-                }
+            const p30s = sortedPoints[start30sIdx];
+            const altNow = p.altitude || p.elevation || 0;
+            const altOld = p30s.altitude || p30s.elevation || 0;
+            const distNow = distAccumulator;
+            const distOld = p30s.totalDistanceMeters || 0;
+            const timeDeltaWindow = (pTime - new Date(p30s.dateTime).getTime()) / 1000;
 
-                // Cap al valore massimo (non puoi avere più del 100% di batteria)
+            let vam = 0;
+            if (timeDeltaWindow > 0) vam = (altNow - altOld) / (timeDeltaWindow / 3600);
+            p.vam = (vam > -5000 && vam < 5000) ? Math.round(vam) : 0; 
+            if (p.vam < 0) p.vam = 0;
+
+            const distDeltaWindow = distNow - distOld;
+            let grad = 0;
+            if (distDeltaWindow > 10) grad = ((altNow - altOld) / distDeltaWindow) * 100;
+            p.gradient = Math.max(-30, Math.min(30, parseFloat(grad.toFixed(1))));
+
+            // NP Accumulator
+            if (count30s > 0) {
+                const avgPower30s = sumPower30s / count30s;
+                rollingPowerSum4 += Math.pow(avgPower30s, 4);
+                rollingPowerCount++;
+            }
+
+            // W' & Work
+            const power = p.powerWatts || 0;
+            if (dt > 0 && dt < 1000) { 
+                this.totalWorkJ += power * dt;
+
+                if (power > cp) currentWPrime -= (power - cp) * dt;
+                else currentWPrime += (cp - power) * dt;
+                
                 if (currentWPrime > CONFIG.athlete.wPrime) currentWPrime = CONFIG.athlete.wPrime;
-                // Floor a 0 (non puoi avere energia negativa)
                 if (currentWPrime < 0) currentWPrime = 0;
 
-                // --- C. Calcolo Zone Cardiache ---
                 const hr = p.heartRateBeatsPerMin || 0;
-                if (hr > 0 && dt > 0 && dt < 1000) {
-                    // Trova l'indice della zona basato sui limiti in CONFIG
-                    // Esempio hrZones: [130, 145, 160, 175, 200]
-                    // Se hr = 150, è <= 130? No. <= 145? No. <= 160? Si -> Indice 2 (Z3)
-                    let zIndex = CONFIG.athlete.hrZones.findIndex(limit => hr <= limit);
-                    
-                    // Se supera il massimo (es. 205bpm), lo mettiamo nell'ultima zona (Z5)
-                    if (zIndex === -1) zIndex = 4;
-                    
-                    zonesAccumulator[zIndex] += dt;
+                if (hr > 0) {
+                    let hIndex = CONFIG.athlete.hrZones.findIndex(limit => hr <= limit);
+                    if (hIndex === -1) hIndex = 4;
+                    this.timeInHrZones[hIndex] += dt;
+                }
+
+                if (power > 0) {
+                    let pIndex = pZones.findIndex(limit => power <= limit);
+                    if (pIndex === -1) pIndex = 6;
+                    this.timeInPowerZones[pIndex] += dt;
                 }
             }
 
-            // Assegnazione valori calcolati al punto
             p.totalDistanceMeters = distAccumulator;
             p.distanceKm = distAccumulator / 1000;
             p.wPrimeBal = currentWPrime;
-            
-            // --- D. Efficienza (Decoupling Proxy) ---
-            // Power / HR (Watt per battito)
             p.efficiency = (p.powerWatts && p.heartRateBeatsPerMin) 
-                ? (p.powerWatts / p.heartRateBeatsPerMin).toFixed(2) 
-                : null;
+                ? (p.powerWatts / p.heartRateBeatsPerMin).toFixed(2) : null;
         }
 
-        // Aggiorna lo stato della classe
+        if (rollingPowerCount > 0) this.normalizedPower = Math.pow(rollingPowerSum4 / rollingPowerCount, 0.25);
+        this.intensityFactor = (cp > 0) ? this.normalizedPower / cp : 0;
+
         this.livePoints = sortedPoints;
-        this.timeInZones = zonesAccumulator;
+
+        // [NEW] Trigger Meteo Update se abbiamo coordinate recenti
+        const lastP = this.livePoints[this.livePoints.length - 1];
+        if (lastP && lastP.position && lastP.position.lat) {
+            this.updateWeather(lastP.position.lat, lastP.position.lon);
+        }
         
-        // Logica di prima attivazione
         if (!this.hasReceivedLive) {
             this.hasReceivedLive = true;
-            console.log(`LiveTrackPro: First Live Data sync. Points: ${this.livePoints.length}`);
+            console.log(`LiveTrackPro: First Live Data sync.`);
         }
         
         this.notify();
