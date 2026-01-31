@@ -94,7 +94,7 @@ export class ChartComponent {
             ]},
             options: {
                 ...config,
-                scales: { ...config.scales, x: { type: 'linear', min: 0, grid: { display: false } }, y: { min: 0 }},
+                scales: { ...config.scales, x: { type: 'linear', min: 0, grid: { display: false } }, y: { beginAtZero: false }},
                 plugins: { legend: { display: false } }
             }
         });
@@ -128,13 +128,11 @@ export class ChartComponent {
                     x: { type: 'linear', min: 0, grid: { display: false } },
                     y: { 
                         type: 'linear', display: true, position: 'left',
-                        min: 0,
                         title: { display: true, text: this.label },
                         grid: { color: '#f0f0f0' }
                     },
                     y1: { 
                         type: 'linear', display: true, position: 'right',
-                        min: 0,
                         grid: { drawOnChartArea: false },
                         title: { display: true, text: label2 } 
                     }
