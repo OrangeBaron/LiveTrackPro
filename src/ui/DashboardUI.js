@@ -8,7 +8,7 @@ export class DashboardUI {
         this.dataManager = dataManager;
         this.isInitialized = false;
         
-        // --- Inizializzazione Componenti (senza renderli ancora) ---
+        // --- Inizializzazione Componenti ---
         
         // Colonna 1
         this.mapComponent = new MapComponent('map-container');
@@ -269,7 +269,8 @@ export class DashboardUI {
             p => p.gradient
         );
 
-        this.powerHrChart.update(live, null, p => p.powerWatts, p => p.heartRateBeatsPerMin);
+        this.powerHrChart.update(live, null, p => p.powerSmooth, p => p.heartRateBeatsPerMin);
+
         this.advancedChart.update(live, null, p => p.wPrimeBal, p => p.efficiency);
         if (powerZones) this.powerZonesChart.update(powerZones);
         if (hrZones) this.hrZonesChart.update(hrZones);

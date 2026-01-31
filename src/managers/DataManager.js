@@ -120,18 +120,22 @@ export class DataManager {
         this.resetAccumulators();
         
         let distAccumulator = 0;
-        let currentWPrime = CONFIG.athlete.wPrime;
+        
+        // --- SETUP W' (Modello Skiba) ---
+        let wPrimeBalance = CONFIG.athlete.wPrime; 
+        const cp = CONFIG.athlete.cp;
+        
+        // Zone per statistiche
+        const pZones = [0.55, 0.75, 0.90, 1.05, 1.20, 1.50].map(pct => Math.round(cp * pct));
+
         let rollingPowerSum4 = 0; 
         let rollingPowerCount = 0;
-        
-        const cp = CONFIG.athlete.cp;
-        const pZones = [0.55, 0.75, 0.90, 1.05, 1.20, 1.50].map(pct => Math.round(cp * pct));
 
         for (let i = 0; i < sortedPoints.length; i++) {
             const p = sortedPoints[i];
             const pTime = new Date(p.dateTime).getTime();
             
-            // 1. Logica Distanza & Elevazione
+            // 1. Calcolo Delta Tempo (dt) e Distanza
             let dt = 0; 
             if (i > 0) {
                 const prev = sortedPoints[i - 1];
@@ -147,9 +151,12 @@ export class DataManager {
                 if (altDiff > 0) this.totalElevationGain += altDiff;
             }
 
-            // 2. Logica Rolling 30s (VAM, Gradiente, NP)
+            // 2. SMOOTHING POTENZA (Media Mobile 30s)
             const { avgPower30s, altOld, distOld, timeDeltaWindow } = this.getRolling30sStats(sortedPoints, i, pTime, distAccumulator);
+            // Se non abbiamo ancora abbastanza storico per la media, usiamo il valore istantaneo
+            const smoothPower = avgPower30s !== null ? avgPower30s : (p.powerWatts || 0);
 
+            // 3. Calcoli Altimetrici
             p.vam = calculateVam((p.altitude || 0), altOld, timeDeltaWindow);
             p.gradient = calculateGradient((p.altitude || 0), altOld, distAccumulator - distOld);
 
@@ -158,27 +165,42 @@ export class DataManager {
                 rollingPowerCount++;
             }
 
-            // 3. W' & Work & Zone
-            const power = p.powerWatts || 0;
+            // 4. METRICA W' (Modello Skiba Esponenziale) & Efficienza
             if (dt > 0 && dt < 1000) { 
-                this.totalWorkJ += power * dt;
+                this.totalWorkJ += (p.powerWatts || 0) * dt; 
 
-                // Modello Skiba CP
-                if (power > cp) currentWPrime -= (power - cp) * dt;
-                else currentWPrime += (cp - power) * dt;
+                // --- ALGORITMO SKIBA ---
+                if (smoothPower > cp) {
+                    wPrimeBalance -= (smoothPower - cp) * dt;
+                } else {
+                    const underP = cp - smoothPower;
+                    // Tau dinamico Skiba 2015
+                    const tau = 546 * Math.exp(-0.01 * underP) + 316;
+                    
+                    const wPrimeExpended = CONFIG.athlete.wPrime - wPrimeBalance;
+                    const newWPrimeExpended = wPrimeExpended * Math.exp(-dt / tau);
+                    
+                    wPrimeBalance = CONFIG.athlete.wPrime - newWPrimeExpended;
+                }
                 
                 // Clamp W'
-                currentWPrime = Math.min(Math.max(currentWPrime, 0), CONFIG.athlete.wPrime);
+                wPrimeBalance = Math.min(Math.max(wPrimeBalance, 0), CONFIG.athlete.wPrime);
 
-                this.accumulateZones(p.heartRateBeatsPerMin, power, dt, pZones);
+                this.accumulateZones(p.heartRateBeatsPerMin, smoothPower, dt, pZones);
             }
 
-            // 4. Assegnazione valori calcolati al punto
+            // 5. Assegnazione valori puliti al punto
             p.totalDistanceMeters = distAccumulator;
             p.distanceKm = distAccumulator / 1000;
-            p.wPrimeBal = currentWPrime;
-            p.efficiency = (p.powerWatts && p.heartRateBeatsPerMin) 
-                ? (p.powerWatts / p.heartRateBeatsPerMin).toFixed(2) : null;
+            p.wPrimeBal = wPrimeBalance;
+            p.powerSmooth = Math.round(smoothPower); 
+            
+            // Efficienza (Decoupling) filtrata
+            if (smoothPower > 10 && p.heartRateBeatsPerMin > 40) {
+                p.efficiency = (smoothPower / p.heartRateBeatsPerMin).toFixed(2);
+            } else {
+                p.efficiency = null;
+            }
         }
 
         // Finalize Statistiche Globali
@@ -215,7 +237,7 @@ export class DataManager {
         return {
             avgPower30s: count > 0 ? sumPower / count : null,
             altOld: p30s.altitude || p30s.elevation || 0,
-            distOld: p30s.totalDistanceMeters || 0, // Attenzione: questo richiede che i punti passati abbiano già la distanza calcolata, nel loop sequenziale va bene
+            distOld: p30s.totalDistanceMeters || 0, 
             timeDeltaWindow: (currentTime - new Date(p30s.dateTime).getTime()) / 1000
         };
     }
