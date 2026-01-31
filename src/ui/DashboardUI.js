@@ -1,13 +1,16 @@
 import { CONFIG } from '../config.js';
 import { MapComponent } from '../components/MapComponent.js';
 import { ChartComponent } from '../components/ChartComponent.js';
+import { DASHBOARD_TEMPLATE } from './DashboardTemplate.js';
 
 export class DashboardUI {
     constructor(dataManager) {
         this.dataManager = dataManager;
         this.isInitialized = false;
         
-        // --- COLONNA 1 ---
+        // --- Inizializzazione Componenti (senza renderli ancora) ---
+        
+        // Colonna 1
         this.mapComponent = new MapComponent('map-container');
         this.elevationChart = new ChartComponent('elevation-chart', 'Altitudine (m)', CONFIG.colors.chartPrimary);
         
@@ -15,18 +18,16 @@ export class DashboardUI {
         this.climbChart = new ChartComponent(
             'climb-chart', 
             'VAM (m/h)', 
-            '#16a085', // Colore VAM (Verde Acqua)
+            '#16a085', // Verde Acqua
             'dual-line',
             { 
                 label2: 'Pendenza (%)', 
-                color2: '#7f8c8d', // Colore Pendenza (Grigio)
+                color2: '#7f8c8d', // Grigio
                 dashed2: true
             }
         );
         
-        // --- COLONNA 2 ---
-        
-        // 1. Grafico Power & HR
+        // Colonna 2
         this.powerHrChart = new ChartComponent(
             'power-hr-chart', 
             'Power (W)', 
@@ -35,7 +36,6 @@ export class DashboardUI {
             { label2: 'Heart Rate (bpm)', color2: '#e74c3c', dashed2: false }
         );
 
-        // 2. Grafico W' Balance & Efficiency
         this.advancedChart = new ChartComponent(
             'advanced-chart', 
             "W' Balance (J)", 
@@ -44,7 +44,6 @@ export class DashboardUI {
             { label2: 'Efficiency (Pw/HR)', color2: CONFIG.colors.efficiency, dashed2: true }
         ); 
         
-        // 3. Grafici Zone
         this.powerZonesChart = new ChartComponent('power-zones-chart', 'Power Zones', '', 'bar', {
             labels: ['Z1', 'Z2', 'Z3', 'Z4', 'Z5', 'Z6', 'Z7'],
             barColors: ['#95a5a6', '#3498db', '#2ecc71', '#f1c40f', '#e67e22', '#e74c3c', '#8e44ad']
@@ -64,21 +63,22 @@ export class DashboardUI {
         this.injectCustomStyles();
         this.renderStructure();
         
-        // Inizializzazione Componenti
+        // Init dei chart sui canvas appena creati
         this.mapComponent.init();
         this.elevationChart.init();
         this.climbChart.init();
-        
         this.powerHrChart.init();
         this.advancedChart.init();
         this.powerZonesChart.init();
         this.hrZonesChart.init(); 
         
+        // Sottoscrizione agli aggiornamenti
         this.dataManager.subscribe(data => this.refresh(data));
         
         this.isInitialized = true;
         console.log("LiveTrackPro: UI Loaded & Ready.");
 
+        // Se ci sono già dati (es. dallo storico), aggiorna subito
         if (this.dataManager.hasReceivedLive) {
             this.dataManager.notify(); 
         }
@@ -103,6 +103,7 @@ export class DashboardUI {
     }
 
     cleanOriginalUI() {
+        // Nasconde tutto tranne i tag script necessari
         Array.from(document.body.children).forEach(child => {
             if (child.tagName !== 'SCRIPT') child.style.display = 'none';
         });
@@ -153,95 +154,33 @@ export class DashboardUI {
         const container = document.createElement('div');
         container.id = 'livetrack-pro-dashboard';
         
-        container.innerHTML = `
-            <div class="ltp-card ltp-header">
-                <div>
-                    <h1 class="ltp-title">Live Track Pro <span class="ltp-subtitle">| Analytics</span></h1>
-                </div>
-                <div id="status-log" class="ltp-status">In attesa di dati...</div>
-            </div>
+        // 1. Genera HTML per i blocchi ripetitivi
+        const metricsHtml = [
+            this.createMetricBox('speed', 'Speed', 'km/h', 'border-blue'),
+            this.createMetricBox('power', 'Power', 'W', 'border-orange'),
+            this.createMetricBox('hr', 'Heart Rate', 'bpm', 'border-red'),
+            this.createMetricBox('cadence', 'Cadence', 'rpm', 'border-purple'),
+            this.createMetricBox('gradient', 'Gradient', '%', 'border-grad'),
+            this.createMetricBox('vam', 'V.A.M.', 'm/h', 'border-vam')
+        ].join('');
 
-            <div class="ltp-grid">
-                ${this.createMetricBox('speed', 'Speed', 'km/h', 'border-blue')}
-                ${this.createMetricBox('power', 'Power', 'W', 'border-orange')}
-                ${this.createMetricBox('hr', 'Heart Rate', 'bpm', 'border-red')}
-                ${this.createMetricBox('cadence', 'Cadence', 'rpm', 'border-purple')}
-                ${this.createMetricBox('gradient', 'Gradient', '%', 'border-grad')}
-                ${this.createMetricBox('vam', 'V.A.M.', 'm/h', 'border-vam')}
-            </div>
+        const summaryHtml = [
+            this.createSummaryItem('time', 'Time', ''),
+            this.createSummaryItem('elevation', 'Ascent', 'm'),
+            this.createSummaryItem('np', 'Norm. Pwr', 'W'),
+            this.createSummaryItem('if', 'Intensity', 'IF'),
+            this.createSummaryItem('work', 'Work', 'kJ'),
+            this.createSummaryItem('weather', 'Live Weather', '')
+        ].join('');
 
-            <div class="ltp-summary-bar">
-                ${this.createSummaryItem('time', 'Time', '')}
-                ${this.createSummaryItem('elevation', 'Ascent', 'm')}
-                ${this.createSummaryItem('np', 'Norm. Pwr', 'W')}
-                ${this.createSummaryItem('if', 'Intensity', 'IF')}
-                ${this.createSummaryItem('work', 'Work', 'kJ')}
-                ${this.createSummaryItem('weather', 'Live Weather', '')}
-            </div>
+        // 2. Inietta tutto nel template
+        let finalHtml = DASHBOARD_TEMPLATE
+            .replace('{{METRICS_GRID}}', metricsHtml)
+            .replace('{{SUMMARY_BAR}}', summaryHtml)
+            .replace('{{COLOR_WPRIME}}', CONFIG.colors.wPrime)
+            .replace('{{COLOR_EFFICIENCY}}', CONFIG.colors.efficiency);
 
-            <div class="ltp-content-grid">
-                
-                <div class="ltp-column">
-                    <div class="ltp-card">
-                        <h3 style="margin:0 0 10px 0; color:#444;">Posizione & Percorso</h3>
-                        <div id="map-container" class="ltp-vis-container"></div>
-                    </div>
-
-                    <div class="ltp-card">
-                        <h3 style="margin:0 0 10px 0; color:#444;">Profilo Altimetrico</h3>
-                        <div class="ltp-chart-container"><canvas id="elevation-chart"></canvas></div>
-                    </div>
-
-                    <div class="ltp-card">
-                        <h3 style="margin:0 0 10px 0; color:#444;">Profilo Salita</h3>
-                        <div class="ltp-chart-container"><canvas id="climb-chart"></canvas></div>
-                    </div>
-                </div>
-
-                <div class="ltp-column">
-                    <div class="ltp-card">
-                        <h3 style="margin:0 0 5px 0; color:#444;">Potenza & Cuore</h3>
-                        <p style="font-size:11px; color:#666; margin:0 0 15px 0;">
-                            <span style="color:#e67e22">●</span> Power (W) &nbsp; 
-                            <span style="color:#e74c3c">●</span> Heart Rate (bpm)
-                        </p>
-                        <div class="ltp-vis-container" style="height: 300px;">
-                            <canvas id="power-hr-chart"></canvas>
-                        </div>
-                    </div>
-
-                    <div class="ltp-card">
-                        <h3 style="margin:0 0 5px 0; color:#444;">Riserva Energetica & Efficienza</h3>
-                        <p style="font-size:11px; color:#666; margin:0 0 15px 0;">
-                            <span style="color:${CONFIG.colors.wPrime}">●</span> W' Balance (J) &nbsp; 
-                            <span style="color:${CONFIG.colors.efficiency}">●</span> Efficienza (Watt/HR)
-                        </p>
-                        <div class="ltp-vis-container" style="height: 300px;">
-                            <canvas id="advanced-chart"></canvas>
-                        </div>
-                    </div>
-
-                    <div class="ltp-card">
-                        <h3 style="margin:0 0 10px 0; color:#444;">Distribuzione Zone</h3>
-                        <div style="display: flex; gap: 15px;">
-                            <div style="flex: 1;">
-                                <h4 style="margin:0 0 5px 0; font-size:12px; color:#666; text-align:center;">POWER (Coggan 7-Zones)</h4>
-                                <div class="ltp-chart-container" style="height: 250px;">
-                                    <canvas id="power-zones-chart"></canvas>
-                                </div>
-                            </div>
-                            <div style="flex: 1;">
-                                <h4 style="margin:0 0 5px 0; font-size:12px; color:#666; text-align:center;">HEART RATE (Friel 5-Zones)</h4>
-                                <div class="ltp-chart-container" style="height: 250px;">
-                                    <canvas id="hr-zones-chart"></canvas>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                </div>
-            </div>
-        `;
+        container.innerHTML = finalHtml;
         document.body.appendChild(container);
     }
 
@@ -276,14 +215,14 @@ export class DashboardUI {
         if (!live || live.length === 0) return;
         const lastPoint = live[live.length - 1];
 
-        // 1. Info
+        // 1. Header Info
         const timeStr = new Date(lastPoint.dateTime).toLocaleTimeString([], { 
             hour: '2-digit', minute: '2-digit', second: '2-digit' 
         });
         document.getElementById('status-log').innerHTML = 
             `<strong>UPDATED:</strong> ${timeStr} &bull; <strong>PTS:</strong> ${live.length}`;
 
-        // 2. Metriche Live
+        // 2. Metriche Live (Top Grid)
         this.updateTextMetric('live-speed', lastPoint.speed ? (lastPoint.speed * 3.6).toFixed(1) : '-');
         this.updateTextMetric('live-power', lastPoint.powerWatts || '-');
         this.updateTextMetric('live-cadence', lastPoint.cadenceCyclesPerMin || '-');
@@ -291,7 +230,7 @@ export class DashboardUI {
         this.updateTextMetric('live-gradient', stats && stats.gradient !== undefined ? stats.gradient : '-');
         this.updateTextMetric('live-vam', stats && stats.vam !== undefined ? stats.vam : '-');
 
-        // 3. Summary Stats
+        // 3. Summary Stats (Middle Bar)
         if (stats) {
             this.updateTextMetric('summary-time', stats.duration || '00:00:00');
             this.updateTextMetric('summary-elevation', stats.elevationGain ? `+${Math.round(stats.elevationGain)}` : '0');
@@ -299,9 +238,10 @@ export class DashboardUI {
             this.updateTextMetric('summary-if', stats.if || '-');
             this.updateTextMetric('summary-work', stats.workKj || '-');
 
+            // Meteo
             if (stats.weather) {
                 const w = stats.weather;
-                const icon = w.description.includes('pioggia') ? '🌧️' : (w.description.includes('nubi') ? '☁️' : '☀️');
+                const icon = (w.description || '').includes('pioggia') ? '🌧️' : ((w.description || '').includes('nubi') ? '☁️' : '☀️');
                 const arrow = this.getWindArrow(w.windDeg);
                 const html = `${w.temp}° <small>${icon}</small> <small style="color:#666; font-size:14px; margin-left:5px;">${arrow} ${w.windSpeed}</small>`;
                 const el = document.getElementById('summary-weather');

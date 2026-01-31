@@ -1,65 +1,64 @@
 # 🚴‍♂️ Live Track Pro
 
-> **Stato del progetto:** 🚧 *Work in Progress (Alpha)* > **Obiettivo:** Creare la dashboard di telemetria definitiva per il ciclismo.
+> **Dashboard di telemetria avanzata per ciclismo**
 
-**Live Track Pro** è un'estensione per browser (Chrome/Edge) progettata per sovrapporsi e sostituire l'interfaccia standard di **Garmin LiveTrack**.
+**Live Track Pro** è un'estensione per browser progettata per sovrapporsi e potenziare l'interfaccia standard di **Garmin LiveTrack**.
 
-L'obiettivo è trasformare una semplice mappa di tracciamento in una **dashboard professionale di analisi in tempo reale**, offrendo metriche avanzate solitamente disponibili solo post-attività su software come GoldenCheetah o TrainingPeaks.
+Trasforma la semplice mappa di tracciamento in una vera e propria **plancia di analisi in tempo reale** (stile ammiraglia), offrendo metriche professionali come Potenza Normalizzata, VAM, W' Balance e dati Meteo, solitamente disponibili solo post-attività.
 
-## ✨ Funzionalità Principali
+## ✨ Funzionalità
 
-Attualmente il sistema intercetta i dati grezzi inviati dal dispositivo Garmin e li rielabora per visualizzare:
+Il sistema intercetta i dati grezzi dal dispositivo Garmin ed esegue calcoli complessi direttamente nel browser per visualizzare:
 
-### 📊 Dashboard Metriche
+### ⚡ Power & Energy Analytics
 
-* **Dati Real-Time:** Velocità, Potenza (W), Cadenza (RPM), Frequenza Cardiaca (BPM).
-* **Layout Responsivo:** Visualizzazione a griglia ottimizzata, con modalità a **due colonne** per schermi desktop.
+* **Metriche di Carico:** Calcolo in tempo reale di **NP** (Normalized Power), **IF** (Intensity Factor) e **Total Work** (kJ bruciati).
+* **W' Balance:** Modello matematico (Skiba) della "batteria" anaerobica residua (Joule).
+* **Efficienza:** Monitoraggio istantaneo del rapporto Potenza/Cuore (Decoupling).
+* **Zone Distribution:** Doppio istogramma dinamico per analizzare il tempo trascorso nelle **7 Zone di Potenza** (Coggan) e nelle **5 Zone Cardiache** (Friel).
 
-### 🗺️ Mappa e Altimetria
+### 🏔️ Climbing Profile
 
-* **Mappa Interattiva:** Tracciamento in tempo reale su base OpenStreetMap.
-* **Confronto Traccia:** Visualizzazione simultanea della posizione reale vs. percorso pianificato (Course).
-* **Profilo Altimetrico:** Grafico dell'elevazione sincronizzato con la posizione.
+* **VAM & Pendenza:** Grafico dedicato che incrocia la Velocità Ascensionale Media (m/h) con la pendenza attuale (%).
+* **Dislivello:** Tracciamento del dislivello positivo accumulato (Elevation Gain) e profilo altimetrico completo.
 
-### 🧠 Analisi Fisiologica
+### 🌤️ Ambiente & Contesto
 
-Calcoli eseguiti in tempo reale nel browser basati sul modello dell'atleta:
+* **Live Weather:** Integrazione con **OpenWeatherMap** per visualizzare temperatura, condizioni atmosferiche, direzione e intensità del vento sul punto esatto dell'atleta.
+* **Mappa & Percorso:** Tracciamento su base OpenStreetMap con confronto visivo tra posizione reale e traccia pianificata (Course).
+* **Race Timer:** Tempo totale trascorso dall'inizio dell'attività.
 
-* **W' Balance (Anaerobic Work Capacity):** Visualizzazione grafica della "batteria" anaerobica residua (Modello Skiba).
-* **Efficiency Factor:** Monitoraggio del rapporto Potenza/Cuore (Decoupling) istantaneo.
-* **Time in Zones:** Istogramma dinamico del tempo trascorso nelle 5 zone cardiache.
+### 📊 Dashboard UI
+
+* **Layout Responsivo:** Interfaccia a griglia ottimizzata, con "Summary Bar" per i totali e grafici dettagliati.
+* **Cockpit View:** I dati critici (Watt, VAM, Pendenza, Vento) sono sempre in primo piano.
 
 ## 🛠️ Installazione
-
-Poiché il progetto è in via di sviluppo, va installato manualmente:
 
 1. Clona o [scarica](https://github.com/OrangeBaron/LiveTrackPro/archive/refs/heads/main.zip) questo repository.
 2. Apri Chrome/Edge e vai su `chrome://extensions`.
 3. Attiva la **Modalità sviluppatore** (in alto a destra).
 4. Clicca su **Carica estensione non pacchettizzata** e seleziona la cartella del progetto.
-5. Apri un link Garmin LiveTrack: la dashboard si caricherà automaticamente.
 
-## ⚙️ Configurazione Atleta
+## ⚙️ Configurazione
 
-Per far sì che i calcoli avanzati (W' e Zone) siano corretti, **devi inserire i tuoi dati fisiologici**.
+Per garantire la precisione dei calcoli fisiologici (W', Zone, IF) e attivare il meteo, è necessario configurare l'estensione:
 
-Apri il file `src/config.js` e modifica la sezione `athlete`:
+1. Clicca sull'icona dell'estensione **Live Track Pro** nella barra del browser.
+2. Inserisci i tuoi parametri:
+   * **Dati Atleta:** Età, CP (Critical Power), W' (Anaerobic Capacity).
+   * **API Key:** Inserisci la tua chiave gratuita di [OpenWeatherMap](https://openweathermap.org/) per i dati meteo.
+3. Clicca su **Salva**.
 
-```javascript
-athlete: {
-    cp: 280,          // La tua Critical Power (Watt)
-    wPrime: 20000,    // La tua W' (Joule)
-    hrZones: [135, 150, 165, 178, 200] // Limiti superiori delle tue Zone HR (Z1-Z5)
-}
-
-```
+Una volta configurato, apri un qualsiasi link Garmin LiveTrack: la dashboard si caricherà automaticamente.
 
 ## 🚀 Roadmap
 
-Il progetto è in attiva evoluzione. I prossimi passi includono:
+Funzionalità pianificate per i prossimi rilasci:
 
-* [ ] Sistema di avvisi in tempo reale
-* [ ] Esportazione e replay delle attività passate
+* [ ] Sistema di esportazione dati (.fit/.gpx)
+* [ ] Modalità Replay per analisi post-gara
+* [ ] Avvisi visivi personalizzabili (es. "Eat Now", "W' Low")
 
 ---
 
