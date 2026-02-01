@@ -32,5 +32,5 @@ export function calculateGradient(altNow, altOld, distDelta) {
 
 // Formatta durata in HH:MM:SS
 export function formatDuration(ms) {
-    return new Date(ms).toISOString().substr(11, 8);
+    return new Date(ms).toISOString().slice(11, 19);
 }

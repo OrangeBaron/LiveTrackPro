@@ -35,7 +35,7 @@
         "src/managers/*",
         "src/ui/*"
       ],
-      "matches": ["<all_urls>"]
+      "matches": ["https://livetrack.garmin.com/*"]
     }
   ],
   "content_scripts": [
