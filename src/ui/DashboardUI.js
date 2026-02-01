@@ -166,6 +166,7 @@ export class DashboardUI {
 
         const summaryHtml = [
             this.createSummaryItem('time', 'Time', ''),
+            this.createSummaryItem('distance', 'Distance', 'km'),
             this.createSummaryItem('elevation', 'Ascent', 'm'),
             this.createSummaryItem('np', 'Norm. Pwr', 'W'),
             this.createSummaryItem('if', 'Intensity', 'IF'),
@@ -234,6 +235,7 @@ export class DashboardUI {
         // 3. Summary Stats (Middle Bar)
         if (stats) {
             this.updateTextMetric('summary-time', stats.duration || '00:00:00');
+            this.updateTextMetric('summary-distance', stats.distance || '0.0');
             this.updateTextMetric('summary-elevation', stats.elevationGain ? `+${Math.round(stats.elevationGain)}` : '0');
             this.updateTextMetric('summary-np', stats.np || '-');
             this.updateTextMetric('summary-if', stats.if || '-');

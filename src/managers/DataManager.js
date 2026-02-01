@@ -55,7 +55,6 @@ export class DataManager {
     notify() {
         if (!this.hasReceivedLive) return;
 
-        // Calcolo Durata Totale
         let durationStr = "00:00:00";
         if (this.livePoints.length > 0) {
             const start = new Date(this.livePoints[0].dateTime);
@@ -78,6 +77,7 @@ export class DataManager {
 
             stats: {
                 duration: durationStr,
+                distance: lastPoint.totalDistanceMeters ? (lastPoint.totalDistanceMeters / 1000).toFixed(1) : '0.0',
                 elevationGain: this.totalElevationGain,
                 workKj: Math.round(this.totalWorkJ / 1000),
                 np: Math.round(this.normalizedPower),
