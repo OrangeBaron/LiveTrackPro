@@ -46,7 +46,7 @@ Per garantire la precisione dei calcoli fisiologici (W', Zone, IF) e attivare il
 
 1. Clicca sull'icona dell'estensione **Live Track Pro** nella barra del browser.
 2. Inserisci i tuoi parametri:
-   * **Dati Atleta:** Età, CP (Critical Power), W' (Anaerobic Capacity).
+   * **Dati Atleta:** FC Max, CP (Critical Power), W' (Anaerobic Capacity).
    * **API Key:** Inserisci la tua chiave gratuita di [OpenWeatherMap](https://openweathermap.org/) per i dati meteo.
 3. Clicca su **Salva**.
 
