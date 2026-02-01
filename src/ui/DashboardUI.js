@@ -12,19 +12,23 @@ export class DashboardUI {
         
         // Colonna 1
         this.mapComponent = new MapComponent('map-container');
-        this.elevationChart = new ChartComponent('elevation-chart', 'Altitudine (m)', CONFIG.colors.chartPrimary);
         
-        // ClimbChart (VAM vs Gradient)
-        this.climbChart = new ChartComponent(
-            'climb-chart', 
-            'VAM (m/h)', 
-            '#16a085', // Verde Acqua
+        this.elevationChart = new ChartComponent(
+            'elevation-chart', 
+            'Altitudine (m)', 
+            CONFIG.colors.chartPrimary,
             'dual-line',
             { 
                 label2: 'Pendenza (%)', 
-                color2: '#7f8c8d', // Grigio
-                dashed2: true
+                color2: '#7f8c8d',
+                dashed2: true 
             }
+        );
+        
+        this.climbChart = new ChartComponent(
+            'climb-chart', 
+            'VAM (m/h)', 
+            '#16a085'
         );
         
         // Colonna 2
@@ -283,16 +287,16 @@ export class DashboardUI {
         
         this.elevationChart.update(
             live, 
-            course, 
+            live,
             p => (p.altitude !== undefined ? p.altitude : p.elevation), 
-            p => p.altitude
+            p => p.gradient
         );
 
         this.climbChart.update(
             live, 
             null,
             p => p.vam,
-            p => p.gradient
+            null
         );
 
         this.powerHrChart.update(live, null, p => p.powerSmooth, p => p.heartRateBeatsPerMin);
