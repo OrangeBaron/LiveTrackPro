@@ -4,11 +4,11 @@ import { WeatherManager } from './WeatherManager.js';
 
 export class DataManager {
     constructor() {
-        this.rawLivePoints = new Map(); // Mantiene l'unicità (per ID o timestamp)
-        this.livePoints = [];           // Array ordinato e PROCESSATO (con VAM, W', etc.)
+        this.rawLivePoints = new Map();
+        this.livePoints = [];
         this.coursePoints = [];
         
-        // Metriche "di stato" (devono persistere tra gli update incrementali)
+        // Metriche "di stato"
         this.wPrimeBalance = CONFIG.athlete.wPrime;
         this.totalElevationGain = 0;
         this.totalWorkJ = 0;
@@ -117,58 +117,43 @@ export class DataManager {
 
         const incomingPoints = data.trackPoints;
         
-        // 1. Identifica l'ultimo timestamp processato (se esiste)
+        // 1. Identifica l'ultimo timestamp processato
         let lastProcessedTime = 0;
         if (this.livePoints.length > 0) {
             lastProcessedTime = new Date(this.livePoints[this.livePoints.length - 1].dateTime).getTime();
         }
 
-        // 2. Controlla se i nuovi dati sono "nel futuro" (Append) o "nel passato" (Merge & Rebuild)
-        // Basta controllare il primo punto del batch in arrivo (assumendo che il batch stesso sia ordinato o coerente)
+        // 2. Controlla se i nuovi dati sono "nel futuro" o "nel passato"
         const firstIncomingTime = new Date(incomingPoints[0].dateTime).getTime();
-        
-        // OPTIMIZATION STRATEGY:
-        // Se il primo punto nuovo è successivo all'ultimo processato, facciamo l'append incrementale.
-        // Altrimenti (buchi riempiti, dati disordinati), facciamo il rebuild completo.
         const isAppendSafe = (lastProcessedTime === 0) || (firstIncomingTime > lastProcessedTime);
 
         if (isAppendSafe && lastProcessedTime > 0) {
-            // --- STRATEGIA A: INCREMENTALE (Veloce) ---
-            // Processiamo solo i punti nuovi, mantenendo lo stato degli accumulatori
+            // --- STRATEGIA A: INCREMENTALE ---
             const newValidPoints = [];
             incomingPoints.forEach(p => {
-                // Doppio check per sicurezza: aggiungi solo se veramente nuovo
                 if (new Date(p.dateTime).getTime() > lastProcessedTime) {
-                    this.rawLivePoints.set(p.dateTime, p); // Teniamo il map aggiornato per sicurezza
+                    this.rawLivePoints.set(p.dateTime, p);
                     newValidPoints.push(p);
                 }
             });
 
             if (newValidPoints.length > 0) {
-                // Aggiungiamo i punti grezzi all'array principale
                 const startIndex = this.livePoints.length;
                 this.livePoints.push(...newValidPoints);
-                
-                // Processiamo SOLO la coda (startIndex -> fine)
                 this.processMetricsLoop(startIndex);
                 console.log(`LiveTrackPro: Optimized Update (+${newValidPoints.length} points)`);
             }
 
         } else {
-            // --- STRATEGIA B: FULL REBUILD (Lento ma Sicuro) ---
-            // Caso iniziale o "riempimento buchi"
+            // --- STRATEGIA B: FULL REBUILD ---
             incomingPoints.forEach(point => {
                 if (point.dateTime) this.rawLivePoints.set(point.dateTime, point);
             });
 
-            // Ricostruiamo l'array da zero
             this.livePoints = Array.from(this.rawLivePoints.values())
                 .sort((a, b) => new Date(a.dateTime) - new Date(b.dateTime));
 
-            // Reset totale accumulatori
             this.resetAccumulators();
-            
-            // Ricalcoliamo tutto dall'inizio
             this.processMetricsLoop(0);
             console.log(`LiveTrackPro: Full Rebuild (${this.livePoints.length} points)`);
         }
@@ -182,15 +167,13 @@ export class DataManager {
 
     /**
      * Il cuore del calcolo. Itera su this.livePoints partendo da 'startIndex'.
-     * - Se startIndex == 0, ricalcola tutta la gara.
-     * - Se startIndex > 0, calcola solo i nuovi punti continuando ad accumulare.
      */
     processMetricsLoop(startIndex) {
         const cp = CONFIG.athlete.cp;
         // Zone per statistiche (Fixed array per evitare allocazioni nel loop)
         const pZones = [0.55, 0.75, 0.90, 1.05, 1.20, 1.50].map(pct => Math.round(cp * pct));
 
-        // Se siamo in append mode, distAccumulator deve partire dall'ultimo valore noto
+        // Inizializzazione Accumulatore Distanza
         let distAccumulator = 0;
         if (startIndex > 0) {
             distAccumulator = this.livePoints[startIndex - 1].totalDistanceMeters || 0;
@@ -202,31 +185,42 @@ export class DataManager {
             
             // 1. Calcolo Delta Tempo (dt) e Distanza
             let dt = 0; 
+            let segmentDist = 0;
+
             if (i > 0) {
                 const prev = this.livePoints[i - 1];
                 const prevTime = new Date(prev.dateTime).getTime();
                 dt = (pTime - prevTime) / 1000;
                 
-                if (p.position && prev.position) {
-                    distAccumulator += getDistanceFromLatLonInMeters(
-                        prev.position.lat, prev.position.lon,
-                        p.position.lat, p.position.lon
-                    );
+                if (p.totalDistanceMeters != null && prev.totalDistanceMeters != null) {
+                    segmentDist = p.totalDistanceMeters - prev.totalDistanceMeters;
+                    distAccumulator = p.totalDistanceMeters;
+                } else {
+                    if (p.position && prev.position) {
+                        segmentDist = getDistanceFromLatLonInMeters(
+                            prev.position.lat, prev.position.lon,
+                            p.position.lat, p.position.lon
+                        );
+                        distAccumulator += segmentDist;
+                    }
                 }
+
                 const altDiff = (p.altitude || p.elevation || 0) - (prev.altitude || prev.elevation || 0);
                 if (altDiff > 0) this.totalElevationGain += altDiff;
+            } else {
+                if (p.totalDistanceMeters != null) {
+                    distAccumulator = p.totalDistanceMeters;
+                }
             }
 
-            // 2. SMOOTHING POTENZA (Media Mobile 30s)
-            // Nota: getRolling30sStats guarda indietro nell'array. Poiché stiamo lavorando
-            // sullo stesso array 'this.livePoints' che contiene anche lo storico, funziona perfettamente
-            // anche in modalità incrementale.
+            // 2. SMOOTHING POTENZA & STATS
             const { avgPower30s, altOld, distOld, timeDeltaWindow } = this.getRolling30sStats(i, pTime, distAccumulator);
             
             const smoothPower = avgPower30s !== null ? avgPower30s : (p.powerWatts || 0);
 
-            // 3. Calcoli Altimetrici
+            // 3. Calcoli Altimetrici (VAM & Gradient)
             p.vam = calculateVam((p.altitude || 0), altOld, timeDeltaWindow);
+            
             p.gradient = calculateGradient((p.altitude || 0), altOld, distAccumulator - distOld);
 
             if (avgPower30s !== null) {
@@ -234,11 +228,10 @@ export class DataManager {
                 this.rollingPowerCount++;
             }
 
-            // 4. METRICA W' (Modello Skiba) & Efficienza
-            if (dt > 0 && dt < 1000) { // filtro pause lunghe o errori
+            // 4. METRICA W' (Modello Skiba)
+            if (dt > 0 && dt < 1000) { 
                 this.totalWorkJ += (p.powerWatts || 0) * dt; 
 
-                // --- ALGORITMO SKIBA ---
                 if (smoothPower > cp) {
                     this.wPrimeBalance -= (smoothPower - cp) * dt;
                 } else {
@@ -258,11 +251,16 @@ export class DataManager {
                 this.accumulateZones(p.heartRateBeatsPerMin, smoothPower, dt, pZones);
             }
 
-            // 5. Assegnazione valori puliti al punto
+            // 5. Assegnazione valori finali al punto
             p.totalDistanceMeters = distAccumulator;
             p.distanceKm = distAccumulator / 1000;
             p.wPrimeBal = this.wPrimeBalance;
             p.powerSmooth = Math.round(smoothPower); 
+            
+            // Fallback Velocità se mancante
+            if (p.speed === undefined && p.speedMetersPerSec !== undefined) {
+                p.speed = p.speedMetersPerSec;
+            }
             
             // Efficienza (Decoupling) filtrata
             if (smoothPower > 10 && p.heartRateBeatsPerMin > 40) {
@@ -272,7 +270,7 @@ export class DataManager {
             }
         }
 
-        // Finalize Statistiche Globali (aggiorniamo NP e TSS alla fine del blocco)
+        // Finalize Statistiche Globali
         if (this.rollingPowerCount > 0) {
             this.normalizedPower = Math.pow(this.rollingPowerSum4 / this.rollingPowerCount, 0.25);
         }
@@ -282,11 +280,10 @@ export class DataManager {
             const startTime = new Date(this.livePoints[0].dateTime).getTime();
             const endTime = new Date(this.livePoints[this.livePoints.length - 1].dateTime).getTime();
             const durationSeconds = (endTime - startTime) / 1000;
-            // Formula TSS standard
             this.tss = (durationSeconds * this.normalizedPower * this.intensityFactor) / (cp * 3600) * 100;
         }
 
-        // Trigger Meteo sull'ultimo punto disponibile
+        // Trigger Meteo
         const lastP = this.livePoints[this.livePoints.length - 1];
         if (lastP?.position?.lat) {
             this.weatherManager.update(lastP.position.lat, lastP.position.lon);
@@ -299,7 +296,6 @@ export class DataManager {
         let startIdx = currentIndex;
 
         // Guarda indietro nell'array (fino a max 30 secondi)
-        // Poiché this.livePoints contiene tutto lo storico, funziona anche in aggiornamento parziale
         for (let j = currentIndex; j >= 0; j--) {
             const pastP = this.livePoints[j];
             const timeDiff = (currentTime - new Date(pastP.dateTime).getTime()) / 1000;
@@ -314,7 +310,6 @@ export class DataManager {
         }
 
         const p30s = this.livePoints[startIdx];
-        // Fallback sicuro se p30s non esiste (caso indice 0)
         if (!p30s) {
              return { avgPower30s: 0, altOld: 0, distOld: 0, timeDeltaWindow: 1 };
         }
@@ -322,7 +317,7 @@ export class DataManager {
         return {
             avgPower30s: count > 0 ? sumPower / count : null,
             altOld: p30s.altitude || p30s.elevation || 0,
-            distOld: p30s.totalDistanceMeters || 0, // Usiamo il valore già calcolato nello storico
+            distOld: p30s.totalDistanceMeters || 0, 
             timeDeltaWindow: (currentTime - new Date(p30s.dateTime).getTime()) / 1000
         };
     }
