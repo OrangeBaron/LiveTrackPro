@@ -20,7 +20,7 @@
   
   "action": {
     "default_icon": {
-      "256": "icon.png"
+      "512": "icon.png"
     }
   },
   "host_permissions": [
