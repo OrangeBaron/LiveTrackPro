@@ -71,7 +71,7 @@ export class DashboardUI {
         const meta = this.extractPageMetadata();
         
         this.cleanOriginalUI();
-        this.injectCustomStyles();
+        // NOTA: injectCustomStyles è stato rimosso in favore del CSS statico
         this.renderStructure(meta);
         
         // Init dei chart sui canvas appena creati
@@ -134,48 +134,6 @@ export class DashboardUI {
         Array.from(document.body.children).forEach(child => {
             if (child.tagName !== 'SCRIPT') child.style.display = 'none';
         });
-    }
-
-    injectCustomStyles() {
-        // Anche qui usiamo i colori dal CONFIG per consistenza
-        const style = document.createElement('style');
-        style.innerHTML = `
-            .ltp-summary-bar {
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-                gap: 10px;
-                background: #fff;
-                padding: 15px;
-                border-radius: 12px;
-                margin-bottom: 20px;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-                border-left: 5px solid #2c3e50;
-            }
-            .ltp-summary-item {
-                display: flex;
-                flex-direction: column;
-                justify-content: center;
-                padding: 0 10px;
-                border-right: 1px solid #eee;
-            }
-            .ltp-summary-item:last-child { border-right: none; }
-            .ltp-summary-label {
-                font-size: 11px;
-                text-transform: uppercase;
-                color: #888;
-                font-weight: 600;
-                margin-bottom: 2px;
-            }
-            .ltp-summary-value {
-                font-size: 18px;
-                font-weight: 700;
-                color: #2c3e50;
-            }
-            .ltp-summary-unit { font-size: 12px; font-weight: 400; color: #666; margin-left: 2px; }
-            .border-grad { border-color: ${CONFIG.colors.slope}; } 
-            .border-vam { border-color: ${CONFIG.colors.vam}; }
-        `;
-        document.head.appendChild(style);
     }
 
     renderStructure(meta) {

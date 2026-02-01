@@ -54,7 +54,7 @@ export const DASHBOARD_TEMPLATE = `
                 <span style="color:#e67e22">●</span> Power (W) &nbsp; 
                 <span style="color:#e74c3c">●</span> Heart Rate (bpm)
             </p>
-            <div class="ltp-vis-container" style="height: 300px;">
+            <div class="ltp-vis-container">
                 <canvas id="power-hr-chart"></canvas>
             </div>
         </div>
@@ -65,7 +65,7 @@ export const DASHBOARD_TEMPLATE = `
                 <span style="color:{{COLOR_WPRIME}}">●</span> W' Balance (J) &nbsp; 
                 <span style="color:{{COLOR_EFFICIENCY}}">●</span> Efficienza (Watt/HR)
             </p>
-            <div class="ltp-vis-container" style="height: 300px;">
+            <div class="ltp-vis-container">
                 <canvas id="advanced-chart"></canvas>
             </div>
         </div>

@@ -2,13 +2,13 @@ body {
     margin: 0; 
     padding: 0; 
     background-color: #f0f2f5; 
-    overflow: auto; 
+    overflow-x: hidden;
 }
 
 #livetrack-pro-dashboard {
     font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     padding: 20px; 
-    width: 95%; 
+    width: 100%; 
     max-width: 1600px;
     margin: 0 auto; 
     box-sizing: border-box;
@@ -22,10 +22,7 @@ body {
     box-shadow: 0 4px 12px rgba(0,0,0,0.05); 
     margin-bottom: 20px;
 }
-
-.ltp-card:last-child {
-    margin-bottom: 0;
-}
+.ltp-card:last-child { margin-bottom: 0; }
 
 .ltp-header {
     display: flex; 
@@ -33,88 +30,92 @@ body {
     align-items: center; 
     padding: 15px 25px;
     margin-bottom: 20px;
+    flex-wrap: wrap; 
+    gap: 10px;
 }
 
-.ltp-title { 
-    margin: 0; 
-    color: #1a1a1a; 
-    font-size: 26px; 
-    font-weight: 700; 
-}
-
-.ltp-subtitle { 
-    font-weight: 300; 
-    color: #666; 
-    font-size: 18px; 
-}
-
-.ltp-status { 
-    text-align: right; 
-    color: #666; 
-    font-size: 13px; 
-}
+.ltp-title { margin: 0; color: #1a1a1a; font-size: 26px; font-weight: 700; }
+.ltp-subtitle { font-weight: 300; color: #666; font-size: 18px; white-space: nowrap; }
+.ltp-status { text-align: right; color: #666; font-size: 13px; }
 
 /* --- GRID METRICHE (Top) --- */
 .ltp-grid { 
     display: grid; 
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); /* Responsive */
-    gap: 20px; 
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); 
+    gap: 15px; 
     margin-bottom: 20px; 
 }
 
 .ltp-metric-box {
     background: white; 
-    padding: 20px; 
+    padding: 15px; 
     border-radius: 12px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.05); 
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05); 
     border-left: 5px solid #ccc;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
 }
 
-.ltp-metric-label { 
-    font-size: 12px; 
-    text-transform: uppercase; 
-    color: #888; 
-    font-weight: 600; 
-    margin-bottom: 5px; 
-}
+.ltp-metric-label { font-size: 11px; text-transform: uppercase; color: #888; font-weight: 600; margin-bottom: 2px; }
+.ltp-metric-value-group { display: flex; align-items: baseline; }
+.ltp-value { font-size: 28px; font-weight: 700; color: #1a1a1a; }
+.ltp-unit { font-size: 12px; color: #666; margin-left: 4px; }
 
-.ltp-metric-value-group { 
-    display: flex; 
-    align-items: baseline; 
-}
-
-.ltp-value { 
-    font-size: 32px; 
-    font-weight: 700; 
-    color: #1a1a1a; 
-}
-
-.ltp-unit { 
-    font-size: 14px; 
-    color: #666; 
-    margin-left: 5px; 
-}
-
-/* Colori Metriche */
+/* Colori Metriche & Bordi */
 .border-blue { border-color: #0056b3; }
 .border-orange { border-color: #e67e22; }
 .border-purple { border-color: #9b59b6; }
 .border-red { border-color: #e74c3c; }
+.border-grad { border-color: #7f8c8d; } 
+.border-vam { border-color: #16a085; }
 
-/* --- GRID CONTENUTO PRINCIPALE (Layout 2 Colonne) --- */
-.ltp-content-grid {
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
+/* --- SUMMARY BAR --- */
+.ltp-summary-bar {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+    gap: 10px;
+    background: #fff;
+    padding: 15px;
+    border-radius: 12px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    border-left: 5px solid #2c3e50;
 }
 
-.ltp-column {
+.ltp-summary-item {
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    justify-content: center;
+    padding: 5px 10px;
+    border-right: 1px solid #eee;
+}
+.ltp-summary-item:last-child { border-right: none; }
+
+/* RIPRISTINATI VALORI ORIGINALI */
+.ltp-summary-label { 
+    font-size: 11px;
+    text-transform: uppercase; 
+    color: #888; 
+    font-weight: 600; 
+    margin-bottom: 2px; 
+}
+.ltp-summary-value { 
+    font-size: 18px;
+    font-weight: 700; 
+    color: #2c3e50; 
+}
+.ltp-summary-unit { 
+    font-size: 12px;
+    font-weight: 400; 
+    color: #666; 
+    margin-left: 2px; 
 }
 
-/* Desktop View: Attiva le due colonne affiancate */
+/* --- GRID CONTENUTO PRINCIPALE --- */
+.ltp-content-grid { display: flex; flex-direction: column; gap: 20px; }
+.ltp-column { display: flex; flex-direction: column; gap: 20px; }
+
 @media (min-width: 960px) {
     .ltp-content-grid {
         display: grid;
@@ -122,19 +123,17 @@ body {
         gap: 20px;
         align-items: start;
     }
-
-    .ltp-column {
-        min-width: 0;
-    }
+    .ltp-column { min-width: 0; }
 }
 
 /* --- CHART CONTAINERS --- */
 .ltp-vis-container { 
-    height: 400px;
+    height: 400px; 
     width: 100%; 
     border-radius: 8px; 
     border: 1px solid #eee; 
     margin-bottom: 5px; 
+    position: relative;
     z-index: 0; 
 }
 
@@ -148,30 +147,37 @@ body {
     position: relative; 
 }
 
-/* --- CUSTOM MAP TOOLTIP --- */
-
+/* --- TOOLTIP MAPPA --- */
 .ltp-map-tooltip {
     background-color: rgba(0, 0, 0, 0.8) !important;
     border: none !important;
     border-radius: 6px !important;
     color: #fff !important;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.3) !important;
     padding: 8px 12px !important;
-    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
     font-size: 13px !important;
-    line-height: 1.4 !important;
 }
 
-.ltp-map-tooltip.leaflet-tooltip-top::before {
-    border-top-color: rgba(0, 0, 0, 0.8) !important;
-}
+/* =========================================
+   📱 MOBILE OPTIMIZATION (Max Width 768px)
+   ========================================= */
+@media (max-width: 768px) {
+    #livetrack-pro-dashboard { padding: 10px; }
 
-.ltp-map-tooltip.leaflet-tooltip-bottom::before {
-    border-bottom-color: rgba(0, 0, 0, 0.8) !important;
-}
-.ltp-map-tooltip.leaflet-tooltip-left::before {
-    border-left-color: rgba(0, 0, 0, 0.8) !important;
-}
-.ltp-map-tooltip.leaflet-tooltip-right::before {
-    border-right-color: rgba(0, 0, 0, 0.8) !important;
+    .ltp-header { padding: 15px; flex-direction: column; align-items: flex-start; }
+    .ltp-title { font-size: 20px; }
+    .ltp-subtitle { font-size: 14px; display: block; margin-top: 2px; }
+    .ltp-status { margin-top: 5px; font-size: 11px; text-align: left; }
+
+    .ltp-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+    .ltp-metric-box { padding: 12px; }
+    .ltp-value { font-size: 24px; }
+
+    .ltp-summary-bar { grid-template-columns: 1fr 1fr; padding: 10px; gap: 15px 10px; }
+    .ltp-summary-item { border-right: none; border-bottom: 1px solid #f0f0f0; padding-bottom: 5px; align-items: flex-start; }
+    .ltp-summary-item:nth-last-child(-n+2) { border-bottom: none; }
+
+    .ltp-vis-container { height: 280px; } 
+    .ltp-chart-container { height: 200px; }
+    
+    .ltp-card div[style*="display: flex"] { flex-direction: column; }
 }
