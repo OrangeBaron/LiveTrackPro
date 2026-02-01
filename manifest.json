@@ -33,7 +33,8 @@
         "src/*",
         "src/components/*",
         "src/managers/*",
-        "src/ui/*"
+        "src/ui/*",
+        "src/utils/*"
       ],
       "matches": ["https://livetrack.garmin.com/*"]
     }
@@ -41,8 +42,8 @@
   "content_scripts": [
     {
       "matches": ["https://livetrack.garmin.com/session/*"],
-      "css": ["dashboard.css"],
-      "js": ["content.js"],
+      "css": ["src/ui/dashboard.css"], 
+      "js": ["src/content.js"],
       "run_at": "document_start"
     }
   ]

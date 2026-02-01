@@ -22,14 +22,27 @@ export const CONFIG = {
     css: [
         'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'
     ],
+    
+    // --- SEZIONE COLORI CENTRALIZZATA ---
     colors: {
+        // Linee Mappa
         liveLine: '#e67e22',
         courseLine: '#95a5a6',
         marker: '#0056b3',
-        chartPrimary: '#0056b3',
-        chartSecondary: '#bdc3c7',
-        wPrime: '#e74c3c',
-        efficiency: '#27ae60'
+
+        // Metriche Singole
+        chartPrimary: '#0056b3',   // Altitudine
+        chartSecondary: '#bdc3c7', // Previsto
+        slope: '#7f8c8d',          // Pendenza
+        vam: '#16a085',            // VAM
+        power: '#e67e22',          // Power Line
+        hr: '#e74c3c',             // Heart Rate Line
+        wPrime: '#e74c3c',         // W' Balance
+        efficiency: '#27ae60',     // Efficienza
+
+        // Palette Zone (Array)
+        powerZones: ['#95a5a6', '#3498db', '#2ecc71', '#f1c40f', '#e67e22', '#e74c3c', '#8e44ad'], // Z1-Z7
+        hrZones: ['#3498db', '#2ecc71', '#f1c40f', '#e67e22', '#e74c3c'] // Z1-Z5
     },
 
     athlete: {

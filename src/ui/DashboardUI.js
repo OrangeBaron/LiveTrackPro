@@ -20,7 +20,7 @@ export class DashboardUI {
             'dual-line',
             { 
                 label2: 'Pendenza (%)', 
-                color2: '#7f8c8d',
+                color2: CONFIG.colors.slope, // REF: config
                 dashed2: true 
             }
         );
@@ -28,16 +28,20 @@ export class DashboardUI {
         this.climbChart = new ChartComponent(
             'climb-chart', 
             'VAM (m/h)', 
-            '#16a085'
+            CONFIG.colors.vam // REF: config
         );
         
         // Colonna 2
         this.powerHrChart = new ChartComponent(
             'power-hr-chart', 
             'Power (W)', 
-            '#e67e22',
+            CONFIG.colors.power, // REF: config
             'dual-line',
-            { label2: 'Heart Rate (bpm)', color2: '#e74c3c', dashed2: false }
+            { 
+                label2: 'Heart Rate (bpm)', 
+                color2: CONFIG.colors.hr, // REF: config
+                dashed2: false 
+            }
         );
 
         this.advancedChart = new ChartComponent(
@@ -50,12 +54,12 @@ export class DashboardUI {
         
         this.powerZonesChart = new ChartComponent('power-zones-chart', 'Power Zones', '', 'bar', {
             labels: ['Z1', 'Z2', 'Z3', 'Z4', 'Z5', 'Z6', 'Z7'],
-            barColors: ['#95a5a6', '#3498db', '#2ecc71', '#f1c40f', '#e67e22', '#e74c3c', '#8e44ad']
+            barColors: CONFIG.colors.powerZones // REF: config
         });
 
         this.hrZonesChart = new ChartComponent('hr-zones-chart', 'HR Zones', '', 'bar', {
             labels: ['Z1', 'Z2', 'Z3', 'Z4', 'Z5'],
-            barColors: ['#3498db', '#2ecc71', '#f1c40f', '#e67e22', '#e74c3c']
+            barColors: CONFIG.colors.hrZones // REF: config
         });
     }
 
@@ -127,13 +131,13 @@ export class DashboardUI {
     }
 
     cleanOriginalUI() {
-        // Nasconde tutto tranne i tag script necessari
         Array.from(document.body.children).forEach(child => {
             if (child.tagName !== 'SCRIPT') child.style.display = 'none';
         });
     }
 
     injectCustomStyles() {
+        // Anche qui usiamo i colori dal CONFIG per consistenza
         const style = document.createElement('style');
         style.innerHTML = `
             .ltp-summary-bar {
@@ -168,8 +172,8 @@ export class DashboardUI {
                 color: #2c3e50;
             }
             .ltp-summary-unit { font-size: 12px; font-weight: 400; color: #666; margin-left: 2px; }
-            .border-grad { border-color: #7f8c8d; }
-            .border-vam { border-color: #16a085; }
+            .border-grad { border-color: ${CONFIG.colors.slope}; } 
+            .border-vam { border-color: ${CONFIG.colors.vam}; }
         `;
         document.head.appendChild(style);
     }
@@ -178,7 +182,6 @@ export class DashboardUI {
         const container = document.createElement('div');
         container.id = 'livetrack-pro-dashboard';
         
-        // 1. Genera HTML per i blocchi ripetitivi
         const metricsHtml = [
             this.createMetricBox('speed', 'Speed', 'km/h', 'border-blue'),
             this.createMetricBox('power', 'Power', 'W', 'border-orange'),
@@ -199,7 +202,6 @@ export class DashboardUI {
             this.createSummaryItem('weather', 'Live Weather', '')
         ].join('');
 
-        // 2. Inietta tutto nel template
         let finalHtml = DASHBOARD_TEMPLATE
             .replace('{{ATHLETE_NAME}}', meta.name)
             .replace('{{SESSION_INFO}}', meta.info)
@@ -243,14 +245,12 @@ export class DashboardUI {
         if (!live || live.length === 0) return;
         const lastPoint = live[live.length - 1];
 
-        // 1. Header Info
         const timeStr = new Date(lastPoint.dateTime).toLocaleTimeString([], { 
             hour: '2-digit', minute: '2-digit', second: '2-digit' 
         });
         document.getElementById('status-log').innerHTML = 
             `<strong>UPDATED:</strong> ${timeStr} &bull; <strong>PTS:</strong> ${live.length}`;
 
-        // 2. Metriche Live (Top Grid)
         this.updateTextMetric('live-speed', lastPoint.speed ? (lastPoint.speed * 3.6).toFixed(1) : '-');
         this.updateTextMetric('live-power', lastPoint.powerWatts || '-');
         this.updateTextMetric('live-cadence', lastPoint.cadenceCyclesPerMin || '-');
@@ -258,7 +258,6 @@ export class DashboardUI {
         this.updateTextMetric('live-gradient', stats && stats.gradient !== undefined ? stats.gradient : '-');
         this.updateTextMetric('live-vam', stats && stats.vam !== undefined ? stats.vam : '-');
 
-        // 3. Summary Stats (Middle Bar)
         if (stats) {
             this.updateTextMetric('summary-time', stats.duration || '00:00:00');
             this.updateTextMetric('summary-distance', stats.distance || '0.0');
@@ -268,7 +267,6 @@ export class DashboardUI {
             this.updateTextMetric('summary-tss', stats.tss || '0');
             this.updateTextMetric('summary-work', stats.workKj || '-');
 
-            // Meteo
             if (stats.weather) {
                 const w = stats.weather;
                 const icon = (w.description || '').includes('pioggia') ? '🌧️' : ((w.description || '').includes('nubi') ? '☁️' : '☀️');
@@ -282,7 +280,6 @@ export class DashboardUI {
             }
         }
 
-        // 4. Update Grafici
         this.mapComponent.update(live, course);
         
         this.elevationChart.update(

@@ -1,5 +1,5 @@
 import { CONFIG } from '../config.js';
-import { formatDuration } from '../utils.js';
+import { formatDuration } from '../utils/helpers.js';
 
 export class MapComponent {
     constructor(containerId) {
