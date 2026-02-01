@@ -1,7 +1,9 @@
 export const DASHBOARD_TEMPLATE = `
 <div class="ltp-card ltp-header">
     <div>
-        <h1 class="ltp-title">Live Track Pro <span class="ltp-subtitle">| Analytics</span></h1>
+        <h1 class="ltp-title">
+            {{ATHLETE_NAME}} <span class="ltp-subtitle">| {{SESSION_INFO}}</span>
+        </h1>
     </div>
     <div id="status-log" class="ltp-status">In attesa di dati...</div>
 </div>

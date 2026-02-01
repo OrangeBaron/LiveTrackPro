@@ -59,9 +59,12 @@ export class DashboardUI {
         if (this.isInitialized) return;
         
         await this.loadResources();
+
+        const meta = this.extractPageMetadata();
+        
         this.cleanOriginalUI();
         this.injectCustomStyles();
-        this.renderStructure();
+        this.renderStructure(meta);
         
         // Init dei chart sui canvas appena creati
         this.mapComponent.init();
@@ -100,6 +103,23 @@ export class DashboardUI {
             });
         });
         return Promise.all(scripts);
+    }
+
+    extractPageMetadata() {
+        try {
+            const nameEl = document.querySelector("div[class*='AthleteDetails'] strong") 
+                           || document.querySelector("strong[id*=':r']");
+            
+            const sessionEl = document.querySelector("div[class*='SessionInfo'] span[title]");
+
+            return {
+                name: nameEl ? nameEl.innerText.trim() : 'Live Track Pro',
+                info: sessionEl ? sessionEl.getAttribute('title') : 'Analytics'
+            };
+        } catch (e) {
+            console.warn("LiveTrackPro: Impossibile estrarre metadati pagina", e);
+            return { name: 'Live Track Pro', info: 'Analytics' };
+        }
     }
 
     cleanOriginalUI() {
@@ -150,7 +170,7 @@ export class DashboardUI {
         document.head.appendChild(style);
     }
 
-    renderStructure() {
+    renderStructure(meta) {
         const container = document.createElement('div');
         container.id = 'livetrack-pro-dashboard';
         
@@ -177,6 +197,8 @@ export class DashboardUI {
 
         // 2. Inietta tutto nel template
         let finalHtml = DASHBOARD_TEMPLATE
+            .replace('{{ATHLETE_NAME}}', meta.name)
+            .replace('{{SESSION_INFO}}', meta.info)
             .replace('{{METRICS_GRID}}', metricsHtml)
             .replace('{{SUMMARY_BAR}}', summaryHtml)
             .replace('{{COLOR_WPRIME}}', CONFIG.colors.wPrime)
