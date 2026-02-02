@@ -128,13 +128,17 @@ body {
 
 /* --- CHART CONTAINERS --- */
 .ltp-vis-container { 
-    height: 400px; 
+    height: 300px; 
     width: 100%; 
     border-radius: 8px; 
     border: 1px solid #eee; 
     margin-bottom: 5px; 
     position: relative;
     z-index: 0; 
+}
+
+#map-container {
+    height: 400px; 
 }
 
 .ltp-chart-container { 

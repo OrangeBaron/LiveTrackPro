@@ -128,13 +128,13 @@ export class ChartComponent {
                     x: { type: 'linear', min: 0, grid: { display: false } },
                     y: { 
                         type: 'linear', display: true, position: 'left',
-                        title: { display: true, text: this.label },
+                        title: { display: false, text: this.label },
                         grid: { color: '#f0f0f0' }
                     },
                     y1: { 
                         type: 'linear', display: true, position: 'right',
                         grid: { drawOnChartArea: false },
-                        title: { display: true, text: label2 } 
+                        title: { display: false, text: label2 } 
                     }
                 }
             }
