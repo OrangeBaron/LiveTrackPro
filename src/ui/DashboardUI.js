@@ -240,12 +240,41 @@ export class DashboardUI {
 
         this.mapComponent.update(live, course);
         
-        this.elevationChart.update(
-            live, 
-            live,
-            p => (p.altitude !== undefined ? p.altitude : p.elevation), 
-            p => p.gradient
-        );
+        // --- GESTIONE GRAFICO ALTIMETRIA ---
+        // Se c'è un percorso pianificato (course), confrontiamo Altitudine Reale vs Prevista.
+        // Se non c'è, manteniamo Altitudine Reale vs Pendenza.
+        
+        const hasCourse = course && course.length > 0;
+        
+        if (hasCourse) {
+            // MODALITÀ: REALE vs PIANIFICATO
+            this.elevationChart.updateSecondaryConfig(
+                'Pianificato (m)',       // Etichetta
+                CONFIG.colors.courseLine,// Colore (grigio tratteggiato)
+                true                     // Tratteggiato
+            );
+
+            this.elevationChart.update(
+                live,   // Dataset 1 (Main): Dati Live
+                course, // Dataset 2 (Secondary): Dati Course
+                p => (p.altitude !== undefined ? p.altitude : p.elevation), // Estrattore Live
+                p => (p.altitude !== undefined ? p.altitude : p.elevation)  // Estrattore Course
+            );
+        } else {
+            // MODALITÀ: REALE vs PENDENZA (Default)
+            this.elevationChart.updateSecondaryConfig(
+                'Pendenza (%)', 
+                CONFIG.colors.slope, 
+                true
+            );
+
+            this.elevationChart.update(
+                live,   // Dataset 1
+                live,   // Dataset 2 (usiamo Live anche per la pendenza)
+                p => (p.altitude !== undefined ? p.altitude : p.elevation), 
+                p => p.gradient
+            );
+        }
 
         this.climbChart.update(
             live, 

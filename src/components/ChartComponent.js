@@ -141,6 +141,29 @@ export class ChartComponent {
         });
     }
 
+    /**
+     * Aggiorna dinamicamente la configurazione del dataset secondario (asse dx)
+     */
+    updateSecondaryConfig(label, color, dashed) {
+        if (!this.chart || this.type !== 'dual-line') return;
+
+        const dataset = this.chart.data.datasets[1];
+        
+        // Evita aggiornamenti inutili se la configurazione è già quella corretta
+        if (dataset.label === label && dataset.borderColor === color) return;
+
+        dataset.label = label;
+        dataset.borderColor = color;
+        dataset.borderDash = dashed ? [5, 5] : [];
+        
+        // Aggiorna anche il titolo dell'asse Y di destra se presente
+        if (this.chart.options.scales.y1 && this.chart.options.scales.y1.title) {
+            this.chart.options.scales.y1.title.text = label;
+        }
+
+        this.chart.update('none'); // Aggiorna senza animazione
+    }
+
     update(dataMain, dataSecondary, extractorMain, extractorSecondary) {
         if (!this.chart) return;
 
@@ -161,7 +184,9 @@ export class ChartComponent {
 
         if (this.type === 'dual-line') {
             this.chart.data.datasets[0].data = mapData(dataMain, extractorMain);
-            this.chart.data.datasets[1].data = mapData(dataMain, extractorSecondary);
+            // MODIFICA: Usa dataSecondary se disponibile, altrimenti fallback su dataMain (per compatibilità con Pendenza/VAM classici)
+            const sourceSecondary = dataSecondary || dataMain;
+            this.chart.data.datasets[1].data = mapData(sourceSecondary, extractorSecondary);
         } else {
             this.chart.data.datasets[1].data = mapData(dataMain, extractorMain);
             if (dataSecondary && extractorSecondary) {
