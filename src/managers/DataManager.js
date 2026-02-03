@@ -93,6 +93,7 @@ export class DataManager {
     }
 
     ingestCourse(data) {
+        // Supporta sia la struttura legacy che quella GraphQL (se adattata) leggendo geoPoints o trackPoints
         const points = data.geoPoints || data.trackPoints || [];
         this.coursePoints = [];
         let distAccumulator = 0;
@@ -101,13 +102,28 @@ export class DataManager {
             const lat = p.latitude || p.lat;
             const lon = p.longitude || p.lon;
             const ele = p.elevation || p.altitude || 0;
+            
+            // MODIFICA: Uso della distanza nativa se presente nel JSON (più preciso)
+            // L'analisi indica che "distanceMeters" è il campo standard FIT per i geoPoints
+            let dist = 0;
+            const nativeDist = (p.distanceMeters !== undefined && p.distanceMeters !== null) 
+                                ? p.distanceMeters 
+                                : null;
 
-            if (i > 0) {
-                const prev = this.coursePoints[i - 1];
-                distAccumulator += getDistanceFromLatLonInMeters(prev.lat, prev.lon, lat, lon);
+            if (nativeDist !== null) {
+                dist = nativeDist;
+                // Allineiamo l'accumulatore nel caso il prossimo punto manchi di distanza
+                distAccumulator = dist;
+            } else {
+                // Fallback: Calcolo manuale geodetico
+                if (i > 0) {
+                    const prev = this.coursePoints[i - 1];
+                    distAccumulator += getDistanceFromLatLonInMeters(prev.lat, prev.lon, lat, lon);
+                }
+                dist = distAccumulator;
             }
 
-            this.coursePoints.push({ lat, lon, altitude: ele, totalDistanceMeters: distAccumulator });
+            this.coursePoints.push({ lat, lon, altitude: ele, totalDistanceMeters: dist });
         });
 
         this.hasReceivedCourses = true;
@@ -170,14 +186,22 @@ export class DataManager {
             // 1. Calcolo Delta Tempo (dt) e Distanza
             let dt = 0; 
             
+            // Verifica presenza distanza nativa (distanceMeters o totalDistanceMeters)
+            // L'analisi suggerisce che distanceMeters è lo standard FIT, totalDistanceMeters è usato in alcune API Live
+            const nativeDist = (p.distanceMeters !== undefined && p.distanceMeters !== null) 
+                               ? p.distanceMeters 
+                               : ((p.totalDistanceMeters !== undefined && p.totalDistanceMeters !== null) ? p.totalDistanceMeters : null);
+            
             if (i > 0) {
                 const prev = this.livePoints[i - 1];
                 const prevTime = new Date(prev.dateTime).getTime();
                 dt = (pTime - prevTime) / 1000;
                 
-                if (p.totalDistanceMeters != null && prev.totalDistanceMeters != null) {
-                    distAccumulator = p.totalDistanceMeters;
+                if (nativeDist !== null) {
+                    // Se abbiamo il dato nativo, lo usiamo direttamente
+                    distAccumulator = nativeDist;
                 } else if (p.position && prev.position) {
+                    // Fallback manuale
                     distAccumulator += getDistanceFromLatLonInMeters(
                         prev.position.lat, prev.position.lon,
                         p.position.lat, p.position.lon
@@ -187,7 +211,7 @@ export class DataManager {
                 const altDiff = (p.altitude || p.elevation || 0) - (prev.altitude || prev.elevation || 0);
                 if (altDiff > 0) this.totalElevationGain += altDiff;
             } else {
-                if (p.totalDistanceMeters != null) distAccumulator = p.totalDistanceMeters;
+                if (nativeDist !== null) distAccumulator = nativeDist;
             }
 
             // 2. RECUPERO STATISTICHE ROLLING (via CyclingPhysics)
