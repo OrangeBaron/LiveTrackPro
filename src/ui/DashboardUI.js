@@ -20,7 +20,7 @@ export class DashboardUI {
             'dual-line',
             { 
                 label2: 'Pendenza (%)', 
-                color2: CONFIG.colors.slope, // REF: config
+                color2: CONFIG.colors.slope,
                 dashed2: true 
             }
         );
@@ -28,18 +28,18 @@ export class DashboardUI {
         this.climbChart = new ChartComponent(
             'climb-chart', 
             'VAM (m/h)', 
-            CONFIG.colors.vam // REF: config
+            CONFIG.colors.vam
         );
         
         // Colonna 2
         this.powerHrChart = new ChartComponent(
             'power-hr-chart', 
             'Power (W)', 
-            CONFIG.colors.power, // REF: config
+            CONFIG.colors.power,
             'dual-line',
             { 
                 label2: 'Heart Rate (bpm)', 
-                color2: CONFIG.colors.hr, // REF: config
+                color2: CONFIG.colors.hr,
                 dashed2: false 
             }
         );
@@ -54,12 +54,12 @@ export class DashboardUI {
         
         this.powerZonesChart = new ChartComponent('power-zones-chart', 'Power Zones', '', 'bar', {
             labels: ['Z1', 'Z2', 'Z3', 'Z4', 'Z5', 'Z6', 'Z7'],
-            barColors: CONFIG.colors.powerZones // REF: config
+            barColors: CONFIG.colors.powerZones
         });
 
         this.hrZonesChart = new ChartComponent('hr-zones-chart', 'HR Zones', '', 'bar', {
             labels: ['Z1', 'Z2', 'Z3', 'Z4', 'Z5'],
-            barColors: CONFIG.colors.hrZones // REF: config
+            barColors: CONFIG.colors.hrZones
         });
     }
 
@@ -249,30 +249,31 @@ export class DashboardUI {
         if (hasCourse) {
             // MODALITÀ: REALE vs PIANIFICATO
             this.elevationChart.updateSecondaryConfig(
-                'Pianificato (m)',       
+                'Pianificato (m)',
                 CONFIG.colors.courseLine,
-                true,                    // Tratteggiato: SI
-                false                    // usa Asse Secondario (Y1): NO -> Usa Y condiviso
+                true,
+                false
+
             );
 
             this.elevationChart.update(
-                live,   // Dataset 1 (Main): Dati Live
-                course, // Dataset 2 (Secondary): Dati Course
-                p => (p.altitude !== undefined ? p.altitude : p.elevation), // Estrattore Live
-                p => (p.altitude !== undefined ? p.altitude : p.elevation)  // Estrattore Course
+                live,
+                course,
+                p => (p.altitude !== undefined ? p.altitude : p.elevation),
+                p => (p.altitude !== undefined ? p.altitude : p.elevation)
             );
         } else {
             // MODALITÀ: REALE vs PENDENZA (Default)
             this.elevationChart.updateSecondaryConfig(
                 'Pendenza (%)', 
                 CONFIG.colors.slope, 
-                false,                   // Tratteggiato: NO (o true se preferisci)
-                true                     // usa Asse Secondario (Y1): SI
+                false,
+                true
             );
 
             this.elevationChart.update(
-                live,   // Dataset 1
-                live,   // Dataset 2 (usiamo Live anche per la pendenza)
+                live,
+                live,
                 p => (p.altitude !== undefined ? p.altitude : p.elevation), 
                 p => p.gradient
             );

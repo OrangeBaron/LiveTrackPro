@@ -18,7 +18,6 @@ export class ChartComponent {
             responsive: true, 
             maintainAspectRatio: false, 
             animation: false,
-            // 'index' permette di vedere i tooltip di entrambi i dataset sovrapposti
             interaction: { mode: 'index', intersect: false }, 
             scales: { x: { grid: { display: false } } }
         };
@@ -26,7 +25,6 @@ export class ChartComponent {
         if (this.type === 'bar') {
             this._initBarChart(ctx, commonConfig);
         } else {
-            // Unifica la gestione: sia 'line' che 'dual-line' usano la nuova logica flessibile
             this._initLineChart(ctx, commonConfig);
         }
     }
@@ -70,33 +68,29 @@ export class ChartComponent {
     _initLineChart(ctx, config) {
         const { label2, color2, dashed2, useSecondaryAxis } = this.extraOptions;
         
-        // Determina se usare l'asse Y1 (destro) o condividere l'asse Y (sinistro).
-        // Se 'useSecondaryAxis' non è definito, usiamo la logica legacy basata sul tipo 'dual-line'.
         const enableY1 = useSecondaryAxis !== undefined ? useSecondaryAxis : (this.type === 'dual-line');
 
         this.chart = new Chart(ctx, {
             type: 'line',
             data: { 
-                labels: [], // Labels vuote inizialmente (gestite via x/y scatter)
+                labels: [],
                 datasets: [
                     {
-                        label: this.label, // Dataset Principale (es. Altitudine)
+                        label: this.label,
                         data: [],
                         borderColor: this.color,
-                        backgroundColor: this.color + '33', // Opacità hex
-                        yAxisID: 'y', // Sempre asse sinistro
+                        backgroundColor: this.color + '33',
+                        yAxisID: 'y',
                         borderWidth: 2, pointRadius: 0, tension: 0.2, fill: true
                     },
                     {
-                        label: label2 || 'Secondary', // Dataset Secondario (es. Pendenza o Course)
+                        label: label2 || 'Previsto',
                         data: [],
                         borderColor: color2 || CONFIG.colors.chartSecondary || '#ccc',
                         backgroundColor: (color2 || '#ccc') + '11',
                         borderDash: dashed2 ? [5, 5] : [],
-                        // Assegna asse Y1 o Y dinamicamente
                         yAxisID: enableY1 ? 'y1' : 'y', 
                         borderWidth: 2, pointRadius: 0, tension: 0.2, 
-                        // Se è tratteggiato (es. previsione) non riempiamo, altrimenti sì
                         fill: !dashed2 
                     }
                 ]
@@ -113,9 +107,8 @@ export class ChartComponent {
                     },
                     y1: { 
                         type: 'linear', display: true, position: 'right',
-                        grid: { drawOnChartArea: false }, // Niente griglia per l'asse secondario
+                        grid: { drawOnChartArea: false },
                         title: { display: false, text: label2 },
-                        // Nascondi l'asse se non stiamo usando la modalità dual-axis
                         display: enableY1 
                     }
                 }
@@ -125,7 +118,6 @@ export class ChartComponent {
 
     /**
      * Aggiorna dinamicamente la configurazione del dataset secondario.
-     * Ora supporta lo spostamento da un asse all'altro (useSecondaryAxis).
      */
     updateSecondaryConfig(label, color, dashed, useSecondaryAxis = true) {
         if (!this.chart || this.type === 'bar') return;
@@ -142,7 +134,7 @@ export class ChartComponent {
         // 2. Aggiorna assegnazione Asse
         const targetAxis = useSecondaryAxis ? 'y1' : 'y';
         
-        // Applica le modifiche solo se necessario per evitare redraw inutili
+        // Applica le modifiche solo se necessario
         let needsUpdate = false;
         
         if (dataset.yAxisID !== targetAxis) {
@@ -181,11 +173,10 @@ export class ChartComponent {
             })).filter(pt => pt.y !== null && isFinite(pt.y));
         };
 
-        // Aggiorna Dataset Principale (Main)
+        // Aggiorna Dataset Principale
         this.chart.data.datasets[0].data = mapData(dataMain, extractorMain);
 
         // Aggiorna Dataset Secondario
-        // Se dataSecondary è null (es. niente Course), usa dataMain (es. per calcolare pendenza dai dati live)
         const sourceSecondary = dataSecondary || dataMain;
         this.chart.data.datasets[1].data = mapData(sourceSecondary, extractorSecondary);
         
