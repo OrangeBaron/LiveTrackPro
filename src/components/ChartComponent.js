@@ -180,6 +180,6 @@ export class ChartComponent {
         const sourceSecondary = dataSecondary || dataMain;
         this.chart.data.datasets[1].data = mapData(sourceSecondary, extractorSecondary);
         
-        this.chart.update();
+        this.chart.update('none');
     }
 }

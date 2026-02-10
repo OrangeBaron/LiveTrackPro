@@ -103,8 +103,7 @@ export class DataManager {
             const lon = p.longitude || p.lon;
             const ele = p.elevation || p.altitude || 0;
             
-            // MODIFICA: Uso della distanza nativa se presente nel JSON (più preciso)
-            // L'analisi indica che "distanceMeters" è il campo standard FIT per i geoPoints
+            // Uso della distanza nativa se presente nel JSON (più preciso)
             let dist = 0;
             const nativeDist = (p.distanceMeters !== undefined && p.distanceMeters !== null) 
                                 ? p.distanceMeters 
@@ -183,43 +182,46 @@ export class DataManager {
             const p = this.livePoints[i];
             const pTime = new Date(p.dateTime).getTime();
             
-            // 1. Calcolo Delta Tempo (dt) e Distanza
+            // 1. Calcolo Delta Tempo (dt)
             let dt = 0; 
-            
-            // Verifica presenza distanza nativa (distanceMeters o totalDistanceMeters)
-            // L'analisi suggerisce che distanceMeters è lo standard FIT, totalDistanceMeters è usato in alcune API Live
-            const nativeDist = (p.distanceMeters !== undefined && p.distanceMeters !== null) 
-                               ? p.distanceMeters 
-                               : ((p.totalDistanceMeters !== undefined && p.totalDistanceMeters !== null) ? p.totalDistanceMeters : null);
-            
             if (i > 0) {
                 const prev = this.livePoints[i - 1];
                 const prevTime = new Date(prev.dateTime).getTime();
                 dt = (pTime - prevTime) / 1000;
-                
-                if (nativeDist !== null) {
-                    // Se abbiamo il dato nativo, lo usiamo direttamente
-                    distAccumulator = nativeDist;
-                } else if (p.position && prev.position) {
-                    // Fallback manuale
-                    distAccumulator += getDistanceFromLatLonInMeters(
+            }
+
+            // 2. Calcolo Distanza
+            const nativeDist = (p.distanceMeters !== undefined && p.distanceMeters !== null) 
+                               ? p.distanceMeters 
+                               : ((p.totalDistanceMeters !== undefined && p.totalDistanceMeters !== null) ? p.totalDistanceMeters : null);
+
+            if (nativeDist !== null) {
+                distAccumulator = nativeDist;
+            } else if (i > 0) {
+                const prev = this.livePoints[i - 1];
+                if (p.position && prev.position) {
+                    const d = getDistanceFromLatLonInMeters(
                         prev.position.lat, prev.position.lon,
                         p.position.lat, p.position.lon
                     );
+                    // Ignora micro-movimenti GPS da fermo
+                    if (d > 0.5) distAccumulator += d;
                 }
-
-                const altDiff = (p.altitude || p.elevation || 0) - (prev.altitude || prev.elevation || 0);
-                if (altDiff > 0) this.totalElevationGain += altDiff;
-            } else {
-                if (nativeDist !== null) distAccumulator = nativeDist;
             }
 
-            // 2. RECUPERO STATISTICHE ROLLING (via CyclingPhysics)
+            // Accumulo Dislivello
+            if (i > 0) {
+                const prev = this.livePoints[i - 1];
+                const altDiff = (p.altitude || p.elevation || 0) - (prev.altitude || prev.elevation || 0);
+                if (altDiff > 0) this.totalElevationGain += altDiff;
+            }
+
+            // 3. RECUPERO STATISTICHE ROLLING (via CyclingPhysics)
             const { avgPower30s, altOld, distOld, timeDeltaWindow } = CyclingPhysics.getRollingStats(this.livePoints, i);
             
             const smoothPower = avgPower30s !== null ? avgPower30s : (p.powerWatts || 0);
 
-            // 3. Calcoli Altimetrici (mantengono dipendenza da utils.js per geometria semplice)
+            // 4. Calcoli Altimetrici
             p.vam = calculateVam((p.altitude || 0), altOld, timeDeltaWindow);
             p.gradient = calculateGradient((p.altitude || 0), altOld, distAccumulator - distOld);
 
@@ -229,10 +231,16 @@ export class DataManager {
                 this.rollingPowerCount++;
             }
 
-            // 4. METRICA W' (via CyclingPhysics)
-            if (dt > 0 && dt < 1000) { 
-                this.totalWorkJ += (p.powerWatts || 0) * dt; 
+            // 5. METRICA W' (via CyclingPhysics)
+            if (dt > 0) { 
+                const currentWatts = p.powerWatts || 0;
                 
+                // Calcoliamo il lavoro accumulato (kJ)
+                if (dt < 300) { 
+                     this.totalWorkJ += currentWatts * dt; 
+                }
+
+                // Calcolo W' Balance
                 this.wPrimeBalance = CyclingPhysics.updateWPrimeBalance(
                     this.wPrimeBalance, 
                     smoothPower, 
@@ -244,7 +252,7 @@ export class DataManager {
                 this.accumulateZones(p.heartRateBeatsPerMin, smoothPower, dt, pZones);
             }
 
-            // 5. Assegnazione valori finali al punto
+            // 6. Assegnazione valori finali al punto
             p.totalDistanceMeters = distAccumulator;
             p.distanceKm = distAccumulator / 1000;
             p.wPrimeBal = this.wPrimeBalance;
@@ -257,7 +265,7 @@ export class DataManager {
             }
         }
 
-        // 6. Calcolo metriche globali (NP, IF, TSS)
+        // 7. Calcolo metriche globali (NP, IF, TSS)
         if (this.livePoints.length > 0) {
             const startTime = new Date(this.livePoints[0].dateTime).getTime();
             const endTime = new Date(this.livePoints[this.livePoints.length - 1].dateTime).getTime();
