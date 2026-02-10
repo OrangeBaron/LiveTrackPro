@@ -26,8 +26,8 @@ export const CONFIG = {
     // --- SEZIONE COLORI CENTRALIZZATA ---
     colors: {
         // Linee Mappa
-        liveLine: '#e67e22',
-        courseLine: '#95a5a6',
+        liveLine: '#3b97f3',
+        courseLine: '#d42fc2',
         marker: '#0056b3',
 
         // Metriche Singole
