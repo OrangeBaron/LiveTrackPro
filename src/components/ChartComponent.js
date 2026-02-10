@@ -18,21 +18,16 @@ export class ChartComponent {
             responsive: true, 
             maintainAspectRatio: false, 
             animation: false,
-            interaction: { mode: 'nearest', axis: 'x', intersect: false },
+            // 'index' permette di vedere i tooltip di entrambi i dataset sovrapposti
+            interaction: { mode: 'index', intersect: false }, 
             scales: { x: { grid: { display: false } } }
         };
 
-        switch (this.type) {
-            case 'bar':
-                this._initBarChart(ctx, commonConfig);
-                break;
-            case 'dual-line':
-                this._initDualLineChart(ctx, commonConfig);
-                break;
-            case 'line':
-            default:
-                this._initStandardLineChart(ctx, commonConfig);
-                break;
+        if (this.type === 'bar') {
+            this._initBarChart(ctx, commonConfig);
+        } else {
+            // Unifica la gestione: sia 'line' che 'dual-line' usano la nuova logica flessibile
+            this._initLineChart(ctx, commonConfig);
         }
     }
 
@@ -72,55 +67,40 @@ export class ChartComponent {
         });
     }
 
-    _initStandardLineChart(ctx, config) {
-        this.chart = new Chart(ctx, {
-            type: 'line',
-            data: { datasets: [
-                {
-                    label: 'Previsto',
-                    data: [],
-                    borderColor: CONFIG.colors.chartSecondary || '#ccc',
-                    borderWidth: 1, pointRadius: 0, borderDash: [5, 5],
-                    fill: false, tension: 0.1
-                },
-                {
-                    label: this.label,
-                    data: [],
-                    borderColor: this.color,
-                    backgroundColor: this.color + '33',
-                    borderWidth: 2, pointRadius: 0, 
-                    fill: true, tension: 0.2
-                }
-            ]},
-            options: {
-                ...config,
-                scales: { ...config.scales, x: { type: 'linear', min: 0, grid: { display: false } }, y: { beginAtZero: false }},
-                plugins: { legend: { display: false } }
-            }
-        });
-    }
-
-    _initDualLineChart(ctx, config) {
-        const { label2, color2, dashed2 } = this.extraOptions;
+    _initLineChart(ctx, config) {
+        const { label2, color2, dashed2, useSecondaryAxis } = this.extraOptions;
+        
+        // Determina se usare l'asse Y1 (destro) o condividere l'asse Y (sinistro).
+        // Se 'useSecondaryAxis' non è definito, usiamo la logica legacy basata sul tipo 'dual-line'.
+        const enableY1 = useSecondaryAxis !== undefined ? useSecondaryAxis : (this.type === 'dual-line');
 
         this.chart = new Chart(ctx, {
             type: 'line',
-            data: { datasets: [
-                {
-                    label: this.label, 
-                    borderColor: this.color,
-                    backgroundColor: this.color + '11',
-                    yAxisID: 'y', borderWidth: 2, pointRadius: 0, tension: 0.2, fill: true,
-                    data: []
-                },
-                {
-                    label: label2 || 'Secondary', 
-                    borderColor: color2 || '#000',
-                    borderDash: dashed2 ? [5, 5] : [],
-                    yAxisID: 'y1', borderWidth: 2, pointRadius: 0, tension: 0.2, fill: false,
-                    data: []
-                }
-            ]},
+            data: { 
+                labels: [], // Labels vuote inizialmente (gestite via x/y scatter)
+                datasets: [
+                    {
+                        label: this.label, // Dataset Principale (es. Altitudine)
+                        data: [],
+                        borderColor: this.color,
+                        backgroundColor: this.color + '33', // Opacità hex
+                        yAxisID: 'y', // Sempre asse sinistro
+                        borderWidth: 2, pointRadius: 0, tension: 0.2, fill: true
+                    },
+                    {
+                        label: label2 || 'Secondary', // Dataset Secondario (es. Pendenza o Course)
+                        data: [],
+                        borderColor: color2 || CONFIG.colors.chartSecondary || '#ccc',
+                        backgroundColor: (color2 || '#ccc') + '11',
+                        borderDash: dashed2 ? [5, 5] : [],
+                        // Assegna asse Y1 o Y dinamicamente
+                        yAxisID: enableY1 ? 'y1' : 'y', 
+                        borderWidth: 2, pointRadius: 0, tension: 0.2, 
+                        // Se è tratteggiato (es. previsione) non riempiamo, altrimenti sì
+                        fill: !dashed2 
+                    }
+                ]
+            },
             options: {
                 ...config,
                 plugins: { legend: { display: false } },
@@ -128,13 +108,15 @@ export class ChartComponent {
                     x: { type: 'linear', min: 0, grid: { display: false } },
                     y: { 
                         type: 'linear', display: true, position: 'left',
-                        title: { display: false, text: this.label },
-                        grid: { color: '#f0f0f0' }
+                        grid: { color: '#f0f0f0' },
+                        beginAtZero: false
                     },
                     y1: { 
                         type: 'linear', display: true, position: 'right',
-                        grid: { drawOnChartArea: false },
-                        title: { display: false, text: label2 } 
+                        grid: { drawOnChartArea: false }, // Niente griglia per l'asse secondario
+                        title: { display: false, text: label2 },
+                        // Nascondi l'asse se non stiamo usando la modalità dual-axis
+                        display: enableY1 
                     }
                 }
             }
@@ -142,23 +124,40 @@ export class ChartComponent {
     }
 
     /**
-     * Aggiorna dinamicamente la configurazione del dataset secondario (asse dx)
+     * Aggiorna dinamicamente la configurazione del dataset secondario.
+     * Ora supporta lo spostamento da un asse all'altro (useSecondaryAxis).
      */
-    updateSecondaryConfig(label, color, dashed) {
-        if (!this.chart || this.type !== 'dual-line') return;
+    updateSecondaryConfig(label, color, dashed, useSecondaryAxis = true) {
+        if (!this.chart || this.type === 'bar') return;
 
         const dataset = this.chart.data.datasets[1];
-        
-        // Evita aggiornamenti inutili se la configurazione è già quella corretta
-        if (dataset.label === label && dataset.borderColor === color) return;
+        const scaleY1 = this.chart.options.scales.y1;
 
+        // 1. Aggiorna stile visivo
         dataset.label = label;
         dataset.borderColor = color;
         dataset.borderDash = dashed ? [5, 5] : [];
+        dataset.fill = !dashed; 
+
+        // 2. Aggiorna assegnazione Asse
+        const targetAxis = useSecondaryAxis ? 'y1' : 'y';
         
-        // Aggiorna anche il titolo dell'asse Y di destra se presente
-        if (this.chart.options.scales.y1 && this.chart.options.scales.y1.title) {
-            this.chart.options.scales.y1.title.text = label;
+        // Applica le modifiche solo se necessario per evitare redraw inutili
+        let needsUpdate = false;
+        
+        if (dataset.yAxisID !== targetAxis) {
+            dataset.yAxisID = targetAxis;
+            needsUpdate = true;
+        }
+        
+        if (scaleY1 && scaleY1.display !== useSecondaryAxis) {
+            scaleY1.display = useSecondaryAxis;
+            needsUpdate = true;
+        }
+
+        // Aggiorna titolo asse secondario se visibile
+        if (useSecondaryAxis && scaleY1 && scaleY1.title) {
+             scaleY1.title.text = label;
         }
 
         this.chart.update('none'); // Aggiorna senza animazione
@@ -182,17 +181,13 @@ export class ChartComponent {
             })).filter(pt => pt.y !== null && isFinite(pt.y));
         };
 
-        if (this.type === 'dual-line') {
-            this.chart.data.datasets[0].data = mapData(dataMain, extractorMain);
-            // MODIFICA: Usa dataSecondary se disponibile, altrimenti fallback su dataMain (per compatibilità con Pendenza/VAM classici)
-            const sourceSecondary = dataSecondary || dataMain;
-            this.chart.data.datasets[1].data = mapData(sourceSecondary, extractorSecondary);
-        } else {
-            this.chart.data.datasets[1].data = mapData(dataMain, extractorMain);
-            if (dataSecondary && extractorSecondary) {
-                this.chart.data.datasets[0].data = mapData(dataSecondary, extractorSecondary);
-            }
-        }
+        // Aggiorna Dataset Principale (Main)
+        this.chart.data.datasets[0].data = mapData(dataMain, extractorMain);
+
+        // Aggiorna Dataset Secondario
+        // Se dataSecondary è null (es. niente Course), usa dataMain (es. per calcolare pendenza dai dati live)
+        const sourceSecondary = dataSecondary || dataMain;
+        this.chart.data.datasets[1].data = mapData(sourceSecondary, extractorSecondary);
         
         this.chart.update();
     }

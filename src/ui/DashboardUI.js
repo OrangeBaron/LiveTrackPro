@@ -249,9 +249,10 @@ export class DashboardUI {
         if (hasCourse) {
             // MODALITÀ: REALE vs PIANIFICATO
             this.elevationChart.updateSecondaryConfig(
-                'Pianificato (m)',       // Etichetta
-                CONFIG.colors.courseLine,// Colore (grigio tratteggiato)
-                true                     // Tratteggiato
+                'Pianificato (m)',       
+                CONFIG.colors.courseLine,
+                true,                    // Tratteggiato: SI
+                false                    // usa Asse Secondario (Y1): NO -> Usa Y condiviso
             );
 
             this.elevationChart.update(
@@ -265,7 +266,8 @@ export class DashboardUI {
             this.elevationChart.updateSecondaryConfig(
                 'Pendenza (%)', 
                 CONFIG.colors.slope, 
-                true
+                false,                   // Tratteggiato: NO (o true se preferisci)
+                true                     // usa Asse Secondario (Y1): SI
             );
 
             this.elevationChart.update(
