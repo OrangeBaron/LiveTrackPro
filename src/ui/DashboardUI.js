@@ -108,7 +108,6 @@ export class DashboardUI {
                         label: 'Efficiency (Pw/HR)',
                         color: CONFIG.colors.efficiency,
                         yAxisID: 'y1',
-                        dashed: true,
                         fill: false,
                         order: 1
                     }
