@@ -10,120 +10,103 @@ export class DashboardUI {
         
         // --- Inizializzazione Componenti ---
     
-        // Colonna 1
+        // Colonna 1: Mappa
         this.mapComponent = new MapComponent('map-container');
         
-        // 1. ELEVATION CHART
+        // 1. ELEVATION CHART (Multi-Dataset: Reale, Pianificato, Pendenza)
         this.elevationChart = new ChartComponent(
             'elevation-chart', 
-            'Altitudine (m)', 
-            CONFIG.colors.chartPrimary,
             'line',
-            { 
-                datasetsConfig: [
-                    // Dataset 0: Altitudine Reale
-                    {
-                        label: 'Altitudine (m)',
-                        color: CONFIG.colors.chartPrimary,
-                        yAxisID: 'y',
-                        fill: false,
-                        order: 1 
-                    },
-                    // Dataset 1: Altitudine Pianificata
-                    { 
-                        label: 'Pianificato (m)', 
-                        color: CONFIG.colors.courseLine, 
-                        dashed: true,
-                        yAxisID: 'y', 
-                        fill: false,
-                        order: 2 
-                    },
-                    // Dataset 2: Pendenza
-                    { 
-                        label: 'Pendenza (%)', 
-                        color: CONFIG.colors.slope, 
-                        dashed: false, 
-                        yAxisID: 'y1', 
-                        fill: true,
-                        order: 3 
-                    }
-                ]
-            }
+            [
+                // Dataset 0: Altitudine Reale
+                {
+                    label: 'Altitudine (m)',
+                    color: CONFIG.colors.chartPrimary,
+                    yAxisID: 'y',
+                    fill: false,
+                    order: 1 
+                },
+                // Dataset 1: Altitudine Pianificata
+                { 
+                    label: 'Pianificato (m)', 
+                    color: CONFIG.colors.courseLine, 
+                    dashed: true,
+                    yAxisID: 'y', 
+                    fill: false,
+                    order: 2 
+                },
+                // Dataset 2: Pendenza
+                { 
+                    label: 'Pendenza (%)', 
+                    color: CONFIG.colors.slope, 
+                    yAxisID: 'y1', 
+                    fill: true,
+                    order: 3 
+                }
+            ]
         );
         
+        // 2. CLIMB CHART (VAM)
         this.climbChart = new ChartComponent(
             'climb-chart', 
-            'VAM (m/h)', 
-            CONFIG.colors.vam,
             'line',
-            { fill: true }
+            [
+                { label: 'VAM (m/h)', color: CONFIG.colors.vam, fill: true }
+            ]
         );
         
-        // 2. POWER & HR CHART
+        // 3. POWER & HR CHART
         this.powerHrChart = new ChartComponent(
             'power-hr-chart', 
-            'Power (W)', 
-            CONFIG.colors.power,
             'line',
-            { 
-                datasetsConfig: [
-                    // Dataset 0: Power
-                    {
-                        label: 'Power (W)',
-                        color: CONFIG.colors.power,
-                        yAxisID: 'y',
-                        fill: true,
-                        order: 2
-                    },
-                    // Dataset 1: Heart Rate
-                    {
-                        label: 'Heart Rate (bpm)',
-                        color: CONFIG.colors.hr,
-                        yAxisID: 'y1',
-                        fill: false,
-                        order: 1
-                    }
-                ]
-            }
+            [
+                {
+                    label: 'Power (W)',
+                    color: CONFIG.colors.power,
+                    yAxisID: 'y',
+                    fill: true,
+                    order: 2
+                },
+                {
+                    label: 'Heart Rate (bpm)',
+                    color: CONFIG.colors.hr,
+                    yAxisID: 'y1',
+                    fill: false,
+                    order: 1
+                }
+            ]
         );
 
-        // 3. ADVANCED CHART
+        // 4. ADVANCED CHART (W' & Efficiency)
         this.advancedChart = new ChartComponent(
             'advanced-chart', 
-            "W' Balance (J)", 
-            CONFIG.colors.wPrime, 
             'line',
-            { 
-                datasetsConfig: [
-                    // Dataset 0: W' Balance
-                    {
-                        label: "W' Balance (J)",
-                        color: CONFIG.colors.wPrime,
-                        yAxisID: 'y',
-                        fill: false,
-                        order: 2
-                    },
-                    // Dataset 1: Efficiency
-                    {
-                        label: 'Efficiency (Pw/HR)',
-                        color: CONFIG.colors.efficiency,
-                        yAxisID: 'y1',
-                        fill: false,
-                        order: 1
-                    }
-                ]
-            }
+            [
+                {
+                    label: "W' Balance (J)",
+                    color: CONFIG.colors.wPrime,
+                    yAxisID: 'y',
+                    fill: false,
+                    order: 2
+                },
+                {
+                    label: 'Efficiency (Pw/HR)',
+                    color: CONFIG.colors.efficiency,
+                    yAxisID: 'y1',
+                    fill: false,
+                    order: 1
+                }
+            ]
         ); 
         
-        this.powerZonesChart = new ChartComponent('power-zones-chart', 'Power Zones', '', 'bar', {
-            labels: ['Z1', 'Z2', 'Z3', 'Z4', 'Z5', 'Z6', 'Z7'],
-            barColors: CONFIG.colors.powerZones
-        });
+        // 5. ZONE CHARTS (Bar)
+        this.powerZonesChart = new ChartComponent('power-zones-chart', 'bar', [
+            { label: 'Power Zones', color: CONFIG.colors.powerZones }
+        ]);
 
-        this.hrZonesChart = new ChartComponent('hr-zones-chart', 'HR Zones', '', 'bar', {
-            labels: ['Z1', 'Z2', 'Z3', 'Z4', 'Z5'],
-            barColors: CONFIG.colors.hrZones
-        });
+        this.hrZonesChart = new ChartComponent('hr-zones-chart', 'bar', [
+            { label: 'HR Zones', color: CONFIG.colors.hrZones }
+        ]);
     }
 
     async bootstrap() {
@@ -302,14 +285,12 @@ export class DashboardUI {
 
         this.mapComponent.update(live, course);
         
-        // --- GESTIONE GRAFICO ALTIMETRIA ---
-        // Dataset index: 0=Reale, 1=Planned, 2=Slope
+        // --- REFACTORING: UPDATE GRAFICI LINEARI ---
         const sourceRealAlt = live;
         const sourceCourseAlt = (course && course.length > 0) ? course : []; 
-        const sourceGradient = live;
 
         this.elevationChart.update(
-            [sourceRealAlt, sourceCourseAlt, sourceGradient],
+            [sourceRealAlt, sourceCourseAlt, live], // Sorgenti dati
             [
                 p => (p.altitude !== undefined ? p.altitude : p.elevation), // Extractor 1 (Reale)
                 p => (p.altitude !== undefined ? p.altitude : p.elevation), // Extractor 2 (Pianificato)
@@ -317,8 +298,6 @@ export class DashboardUI {
             ]
         );
 
-        // --- GESTIONE GRAFICO POWER & HR ---
-        // Dataset index: 0=Power, 1=HR
         this.climbChart.update(
             [live], 
             [p => p.vam]
@@ -329,15 +308,25 @@ export class DashboardUI {
             [p => p.powerSmooth, p => p.heartRateBeatsPerMin]
         );
 
-        // --- GESTIONE GRAFICO ADVANCED ---
-        // Dataset index: 0=W', 1=Efficiency
         this.advancedChart.update(
             [live, live], 
             [p => p.wPrimeBal, p => p.efficiency]
         );
         
-        if (powerZones) this.powerZonesChart.update(powerZones);
-        if (hrZones) this.hrZonesChart.update(hrZones);
+        // --- REFACTORING: UPDATE GRAFICI A BARRE (con etichette) ---
+        if (powerZones) {
+            this.powerZonesChart.update(
+                powerZones, 
+                ['Z1', 'Z2', 'Z3', 'Z4', 'Z5', 'Z6', 'Z7'] // Labels per l'asse X
+            );
+        }
+        
+        if (hrZones) {
+            this.hrZonesChart.update(
+                hrZones, 
+                ['Z1', 'Z2', 'Z3', 'Z4', 'Z5'] // Labels per l'asse X
+            );
+        }
     }
 
     updateTextMetric(id, value) {

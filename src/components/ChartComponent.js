@@ -1,144 +1,90 @@
 export class ChartComponent {
-    constructor(canvasId, label, color, type = 'line', options = {}) {
+    /**
+     * @param {string} canvasId - ID dell'elemento canvas nel DOM
+     * @param {string} type - 'line' oppure 'bar'
+     * @param {Array} config - Array di oggetti configurazione dataset
+     * Esempio config: [{ label: 'Power', color: '#ff0000', yAxisID: 'y', fill: true }]
+     */
+    constructor(canvasId, type = 'line', config = []) {
         this.canvasId = canvasId;
-        this.label = label;
-        this.color = color;
-        this.type = type;
+        this.type = type; 
+        this.datasetsConfig = config;
         this.chart = null;
-        this.extraOptions = options; 
     }
 
     init() {
         if (typeof Chart === 'undefined') return;
         const ctx = document.getElementById(this.canvasId).getContext('2d');
         
-        const commonConfig = {
-            responsive: true, 
-            maintainAspectRatio: false, 
+        const isBar = (this.type === 'bar');
+
+        // Configurazione comune di base per tutti i grafici
+        const commonOptions = {
+            responsive: true,
+            maintainAspectRatio: false,
             animation: false,
-            interaction: { mode: 'nearest', axis: 'x', intersect: false }, 
+            interaction: { mode: 'nearest', axis: 'x', intersect: false },
+            plugins: { legend: { display: false } },
             scales: { x: { grid: { display: false } } }
         };
 
-        if (this.type === 'bar') {
-            this._initBarChart(ctx, commonConfig);
-        } else {
-            this._initLineChart(ctx, commonConfig);
-        }
-    }
+        // Costruiamo i dataset per Chart.js mappando la nostra configurazione
+        const datasets = this.datasetsConfig.map(cfg => {
+            // Per i grafici a linea usiamo il colore con trasparenza per il background (fill)
+            // Per i grafici a barre usiamo il colore pieno
+            const bgColor = isBar ? cfg.color : (cfg.color + '33');
 
-    _initBarChart(ctx, config) {
-        // Recuperiamo le opzioni con fallback
-        const labels = this.extraOptions.labels || ['Z1', 'Z2', 'Z3', 'Z4', 'Z5'];
-        const colors = this.extraOptions.barColors || ['#3498db', '#2ecc71', '#f1c40f', '#e67e22', '#e74c3c'];
-
-        // Creiamo un array di zeri lungo quanto le labels
-        const initialData = new Array(labels.length).fill(0);
-
-        this.chart = new Chart(ctx, {
-            type: 'bar',
-            data: { 
-                labels: labels,
-                datasets: [{
-                    label: this.label,
-                    data: initialData,
-                    backgroundColor: colors,
-                    borderRadius: 4
-                }]
-            },
-            options: { 
-                ...config, 
-                plugins: { legend: { display: false } },
-                scales: {
-                    y: { 
-                        display: false,
-                        grid: { display: false } 
-                    },
-                    x: {
-                        grid: { display: false },
-                        ticks: { font: { size: 10 } }
-                    }
-                }
-            }
+            return {
+                label: cfg.label || '',
+                data: [], // Inizialmente vuoto
+                borderColor: cfg.color,
+                backgroundColor: bgColor,
+                borderDash: cfg.dashed ? [5, 5] : [],
+                yAxisID: cfg.yAxisID || 'y',
+                fill: cfg.fill !== undefined ? cfg.fill : false,
+                order: cfg.order || 0,
+                
+                // Stile specifico per tipo
+                borderRadius: isBar ? 4 : 0,
+                borderWidth: isBar ? 0 : 2,
+                pointRadius: 0,
+                tension: 0.2
+            };
         });
-    }
 
-    _initLineChart(ctx, config) {
-        let datasets = [];
-        let enableY1 = false;
-
-        // 1. MODALITÀ AVANZATA: datasetsConfig esplicito (es. Elevation Chart a 3 vie)
-        if (this.extraOptions.datasetsConfig && Array.isArray(this.extraOptions.datasetsConfig)) {
-            datasets = this.extraOptions.datasetsConfig.map(ds => {
-                return {
-                    label: ds.label,
-                    data: [],
-                    borderColor: ds.color || ds.borderColor,
-                    backgroundColor: (ds.color || ds.borderColor) + '33', // Trasparenza
-                    borderDash: ds.dashed ? [5, 5] : [],
-                    yAxisID: ds.yAxisID || 'y',
-                    borderWidth: 2, 
-                    pointRadius: 0, 
-                    tension: 0.2, 
-                    fill: ds.fill !== undefined ? ds.fill : false,
-                    order: ds.order || 0
-                };
-            });
-
-            if (datasets.some(d => d.yAxisID === 'y1')) {
-                enableY1 = true;
-            }
-
-        } else {
-            // 2. MODALITÀ LEGACY: Costruzione standard (es. Power/HR Chart)
-            // Mantenuta per retrocompatibilità con gli altri grafici definiti in DashboardUI
-            
-            datasets.push({
-                label: this.label,
-                data: [],
-                borderColor: this.color,
-                backgroundColor: this.color + '33',
-                yAxisID: 'y',
-                borderWidth: 2, pointRadius: 0, tension: 0.2, 
-                fill: this.extraOptions.fill !== undefined ? this.extraOptions.fill : false
-            });
-
-            if (this.extraOptions.label2) {
-                const { label2, color2, dashed2, useSecondaryAxis } = this.extraOptions;
-                enableY1 = useSecondaryAxis !== undefined ? useSecondaryAxis : (this.type === 'dual-line');
-
-                datasets.push({
-                    label: label2,
-                    data: [],
-                    borderColor: color2 || '#ccc',
-                    backgroundColor: (color2 || '#ccc') + '33',
-                    borderDash: dashed2 ? [5, 5] : [],
-                    yAxisID: enableY1 ? 'y1' : 'y', 
-                    borderWidth: 2, pointRadius: 0, tension: 0.2, 
-                    fill: false 
-                });
-            }
-        }
+        // Controlliamo se qualcuno dei dataset richiede l'asse destro (y1)
+        const enableY1 = datasets.some(d => d.yAxisID === 'y1');
 
         this.chart = new Chart(ctx, {
-            type: 'line',
+            type: this.type,
             data: { 
-                labels: [],
-                datasets: datasets
+                labels: [], // Verranno popolate dinamicamente per i bar chart
+                datasets: datasets 
             },
             options: {
-                ...config,
-                plugins: { legend: { display: false } },
+                ...commonOptions,
                 scales: {
-                    x: { type: 'linear', min: 0, grid: { display: false } },
+                    ...commonOptions.scales,
                     y: { 
-                        type: 'linear', display: true, position: 'left',
+                        display: !isBar, // Nascondiamo asse Y per le barre "sparkline"
+                        position: 'left', 
                         grid: { color: '#f0f0f0' },
-                        beginAtZero: false
+                        beginAtZero: isBar 
                     },
                     y1: { 
-                        type: 'linear', display: enableY1, position: 'right',
-                        grid: { drawOnChartArea: false }
+                        display: enableY1, 
+                        position: 'right', 
+                        grid: { drawOnChartArea: false } 
+                    },
+                    x: {
+                        ...commonOptions.scales.x,
+                        // Se è una linea, l'asse X deve essere LINEARE (numerico: km)
+                        // Se sono barre (Zone), deve essere CATEGORY (default)
+                        type: isBar ? 'category' : 'linear',
+                        min: 0,
+                        
+                        // Per i bar chart mostriamo le label (ticks), per le linee no (di solito)
+                        ticks: { display: isBar, font: { size: 10 } }
                     }
                 }
             }
@@ -146,54 +92,44 @@ export class ChartComponent {
     }
 
     /**
-     * Metodo Update Unificato.
+     * Aggiorna i dati del grafico.
+     * @param {Array} sources - Array di array di dati sorgente (es. [livePoints, coursePoints])
+     * @param {Array} extractors - Array di funzioni (per linee) o array di labels (per barre)
      */
-    update(dataSources, extractors) {
+    update(sources, extractors) {
         if (!this.chart) return;
 
-        // --- GESTIONE GRAFICO A BARRE ---
+        // --- GESTIONE BAR CHART ---
+        // Per i grafici a barre, 'sources' è direttamente l'array dei valori (es. [10, 20, 5])
+        // e 'extractors' (opzionale) sono le labels dell'asse X.
         if (this.type === 'bar') {
-            const values = Array.isArray(dataSources) ? dataSources : [];
+            const values = Array.isArray(sources) ? sources : [];
             this.chart.data.datasets[0].data = values;
+            
+            if (extractors && Array.isArray(extractors)) {
+                this.chart.data.labels = extractors;
+            }
+            
             this.chart.update();
             return;
         }
 
-        // --- GESTIONE GRAFICO LINEARE (Multi-Dataset) ---
-        const mapData = (points, extractor) => {
-            if (!points || !extractor) return [];
-            return points.map(p => ({
-                x: (p.distanceKm !== undefined) ? p.distanceKm : (p.totalDistanceMeters || 0) / 1000,
-                y: extractor(p)
-            })).filter(pt => pt.y !== null && isFinite(pt.y));
-        };
+        // --- GESTIONE LINE CHART ---
+        // Iteriamo sui dataset configurati e aggiorniamo ognuno con la sua sorgente ed estrattore
+        this.chart.data.datasets.forEach((dataset, i) => {
+            const source = sources[i] || [];
+            const extractor = extractors ? extractors[i] : null;
 
-        // Normalizziamo gli argomenti per gestire sia la nuova firma array che quella vecchia
-        let sources = [];
-        let exts = [];
-
-        if (Array.isArray(extractors)) {
-            // Nuova firma: update([src1, src2], [ext1, ext2])
-            sources = dataSources;
-            exts = extractors;
-        } else {
-            // Vecchia firma fallback: update(src1, src2, ext1, ext2)
-            sources = [arguments[0], arguments[1]];
-            exts = [arguments[2], arguments[3]];
-        }
-
-        // Iteriamo sui dataset configurati nel chart e li aggiorniamo
-        this.chart.data.datasets.forEach((dataset, index) => {
-            const source = sources[index];
-            const extractor = exts[index];
-
-            if (source && extractor) {
-                dataset.data = mapData(source, extractor);
-            } else if (Array.isArray(source) && source.length === 0) { // Caso in cui passiamo array vuoto esplicito
-                dataset.data = [];
+            if (source.length > 0 && extractor) {
+                // Mappiamo i dati nel formato {x, y} richiesto da Chart.js per le linee temporali/distanza
+                dataset.data = source.map(p => ({
+                    x: (p.distanceKm !== undefined) ? p.distanceKm : (p.totalDistanceMeters || 0) / 1000,
+                    y: extractor(p)
+                })).filter(pt => pt.y !== null && isFinite(pt.y)); // Filtriamo null o infiniti
             }
         });
         
+        // Update 'none' per massimizzare le performance (no animazioni)
         this.chart.update('none');
     }
 }
