@@ -23,7 +23,7 @@ export const DASHBOARD_TEMPLATE = `
             <h3 style="margin:0 0 5px 0; color:#444;">Posizione & Percorso</h3>
             <p style="font-size:11px; color:#666; margin:0 0 15px 0;">
                 <span style="color:#3b97f3">●</span> Live Track &nbsp; 
-                <span style="color:#d42fc2">●</span> Course (Pianificato)
+                <span style="color:#ac06bc">●</span> Course (Pianificato)
             </p>
             <div id="map-container" class="ltp-vis-container"></div>
         </div>

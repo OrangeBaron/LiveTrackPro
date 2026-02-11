@@ -93,14 +93,30 @@ export class DataManager {
     }
 
     ingestCourse(data) {
-        // Supporta sia la struttura legacy che quella GraphQL (se adattata) leggendo geoPoints o trackPoints
-        const points = data.geoPoints || data.trackPoints || [];
+        // 1. Estrazione Array Punti: Gestiamo la struttura annidata "courses[0].coursePoints"
+        let rawPoints = [];
+        
+        if (data.courses && data.courses.length > 0 && data.courses[0].coursePoints) {
+            // Nuova struttura rilevata dal tuo JSON
+            rawPoints = data.courses[0].coursePoints;
+        } else {
+            // Fallback per strutture legacy o differenti endpoint
+            rawPoints = data.geoPoints || data.trackPoints || [];
+        }
+
         this.coursePoints = [];
         let distAccumulator = 0;
 
-        points.forEach((p, i) => {
-            const lat = p.latitude || p.lat;
-            const lon = p.longitude || p.lon;
+        rawPoints.forEach((p, i) => {
+            // 2. Estrazione Coordinate: Gestiamo l'oggetto "position"
+            // Se c'è p.position usiamo quello, altrimenti cerchiamo lat/latitude direttamente
+            const pos = p.position || p;
+            const lat = pos.lat || pos.latitude;
+            const lon = pos.lon || pos.longitude;
+            
+            // Se non abbiamo coordinate valide, saltiamo il punto
+            if (!lat || !lon) return;
+
             const ele = p.elevation || p.altitude || 0;
             
             // Uso della distanza nativa se presente nel JSON (più preciso)
@@ -111,12 +127,12 @@ export class DataManager {
 
             if (nativeDist !== null) {
                 dist = nativeDist;
-                // Allineiamo l'accumulatore nel caso il prossimo punto manchi di distanza
+                // Allineiamo l'accumulatore
                 distAccumulator = dist;
             } else {
                 // Fallback: Calcolo manuale geodetico
-                if (i > 0) {
-                    const prev = this.coursePoints[i - 1];
+                if (i > 0 && this.coursePoints.length > 0) {
+                    const prev = this.coursePoints[this.coursePoints.length - 1];
                     distAccumulator += getDistanceFromLatLonInMeters(prev.lat, prev.lon, lat, lon);
                 }
                 dist = distAccumulator;
@@ -125,6 +141,8 @@ export class DataManager {
             this.coursePoints.push({ lat, lon, altitude: ele, totalDistanceMeters: dist });
         });
 
+        console.log(`LiveTrackPro: Course ingested with ${this.coursePoints.length} points.`);
+        
         this.hasReceivedCourses = true;
         this.notify();
     }

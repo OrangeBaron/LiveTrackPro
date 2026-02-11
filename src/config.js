@@ -27,7 +27,7 @@ export const CONFIG = {
     colors: {
         // Linee Mappa
         liveLine: '#3b97f3',
-        courseLine: '#d42fc2',
+        courseLine: '#ac06bc',
         marker: '#0056b3',
 
         // Metriche Singole
