@@ -96,7 +96,13 @@ export class DataManager {
 
     // Ora è asincrono per gestire il fetch dell'elevazione
     async ingestCourse(data) {
-        // 1. Estrazione Array Punti: Gestiamo la struttura annidata "courses[0].coursePoints"
+        // 1. BLOCCO DI SICUREZZA: Se abbiamo già il percorso, ci fermiamo qui.
+        // Il percorso pianificato non cambia durante l'attività.
+        if (this.hasReceivedCourses) {
+            return;
+        }
+
+        // Estrazione Array Punti: Gestiamo la struttura annidata "courses[0].coursePoints"
         let rawPoints = [];
         
         if (data.courses && data.courses.length > 0 && data.courses[0].coursePoints) {
@@ -105,6 +111,9 @@ export class DataManager {
             // Fallback per strutture legacy o differenti endpoint
             rawPoints = data.geoPoints || data.trackPoints || [];
         }
+
+        // Se l'array è vuoto, usciamo senza settare il flag a true
+        if (rawPoints.length === 0) return;
 
         this.coursePoints = [];
         let distAccumulator = 0;

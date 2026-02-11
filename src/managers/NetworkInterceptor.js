@@ -99,7 +99,7 @@ export class NetworkInterceptor {
         if (this.historyFetched) return; 
         this.historyFetched = true;
 
-        console.log("🚀 LiveTrackPro: Starting forced history fetch...");
+        console.log("LiveTrackPro: Starting forced data fetch (History + Course)...");
 
         // Estrazione ID Sessione dall'URL
         const pathParts = window.location.pathname.split('/');
@@ -121,32 +121,49 @@ export class NetworkInterceptor {
             }
         }
 
-        // Costruzione URL API
-        let apiUrl = `https://livetrack.garmin.com/api/sessions/${sessionId}/track-points/common`;
-        if (tokenUrl) apiUrl += `?token=${tokenUrl}`;
+        const headers = {
+            "livetrack-csrf-token": tokenCsrf,
+            "accept": "application/json",
+            "priority": "u=1, i"
+        };
 
+        // --- 1. PREPARAZIONE URL ---
+        let trackUrl = `https://livetrack.garmin.com/api/sessions/${sessionId}/track-points/common`;
+        let courseUrl = `https://livetrack.garmin.com/api/sessions/${sessionId}/courses`;
+        
+        if (tokenUrl) {
+            trackUrl += `?token=${tokenUrl}`;
+            courseUrl += `?token=${tokenUrl}`;
+        }
+
+        // --- 2. ESECUZIONE PARALLELA (Fetch) ---
         try {
-            // Usa fetch originale per evitare loop o interferenze
-            const response = await this.originalFetch(apiUrl, {
-                method: "GET",
-                headers: {
-                    "livetrack-csrf-token": tokenCsrf,
-                    "accept": "application/json",
-                    "priority": "u=1, i"
-                }
-            });
+            const [trackRes, courseRes] = await Promise.allSettled([
+                this.originalFetch(trackUrl, { method: "GET", headers }),
+                this.originalFetch(courseUrl, { method: "GET", headers })
+            ]);
 
-            if (response.ok) {
-                const data = await response.json();
-                console.log(`🎉 LiveTrackPro: History fetched (${data.trackPoints?.length || 0} points).`);
-                
-                // Inietta i dati come se fossero arrivati dal live
+            // --- 3. GESTIONE TRACK POINTS ---
+            if (trackRes.status === 'fulfilled' && trackRes.value.ok) {
+                const data = await trackRes.value.json();
+                console.log(`LiveTrackPro: History fetched (${data.trackPoints?.length || 0} points).`);
                 if (this.onLivePoints) this.onLivePoints(data);
             } else {
-                console.warn(`LiveTrackPro: Error fetching history: ${response.status}`);
+                console.warn(`LiveTrackPro: History fetch skipped or failed.`);
             }
+
+            // --- 4. GESTIONE COURSES ---
+            if (courseRes.status === 'fulfilled' && courseRes.value.ok) {
+                const data = await courseRes.value.json();
+                console.log(`LiveTrackPro: Course fetched manually.`);
+                if (this.onCoursePoints) this.onCoursePoints(data);
+            } else {
+                // Non è un errore critico, magari non c'è un percorso caricato
+                console.log(`LiveTrackPro: No course data found via forced fetch.`);
+            }
+
         } catch (e) {
-            console.error("LiveTrackPro: History fetch fatal error:", e);
+            console.error("LiveTrackPro: Forced fetch fatal error:", e);
         }
     }
 }
