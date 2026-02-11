@@ -16,7 +16,7 @@ export class ChartComponent {
             responsive: true, 
             maintainAspectRatio: false, 
             animation: false,
-            interaction: { mode: 'index', intersect: false }, 
+            interaction: { mode: 'nearest', axis: 'x', intersect: false }, 
             scales: { x: { grid: { display: false } } }
         };
 
