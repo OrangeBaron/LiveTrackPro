@@ -31,8 +31,8 @@ export const CONFIG = {
         marker: '#0056b3',
 
         // Metriche Singole
-        chartPrimary: '#0056b3',   // Altitudine
-        chartSecondary: '#bdc3c7', // Previsto
+        elevation: '#0056b3',      // Altitudine
+        speed: '#0056b3',          // Velocità
         slope: '#7f8c8d',          // Pendenza
         vam: '#16a085',            // VAM
         power: '#e67e22',          // Power Line

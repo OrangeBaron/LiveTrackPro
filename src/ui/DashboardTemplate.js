@@ -38,8 +38,9 @@ export const DASHBOARD_TEMPLATE = `
         </div>
 
         <div class="ltp-card">
-            <h3 style="margin:0 0 5px 0; color:#444;">Velocità Ascensionale Media</h3>
+            <h3 style="margin:0 0 5px 0; color:#444;">Velocità & VAM</h3>
             <p style="font-size:11px; color:#666; margin:0 0 15px 0;">
+                <span style="color:#0056b3">●</span> Velocità (km/h)
                 <span style="color:#16a085">●</span> VAM (m/h)
             </p>
             <div class="ltp-chart-container"><canvas id="climb-chart"></canvas></div>

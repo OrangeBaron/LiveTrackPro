@@ -95,13 +95,14 @@ export class DashboardUI {
 
         // Grafici
         this.charts.elevation = new ChartComponent('elevation-chart', 'line', [
-            { label: 'Altitudine (m)', color: CONFIG.colors.chartPrimary, yAxisID: 'y', order: 1 },
+            { label: 'Altitudine (m)', color: CONFIG.colors.elevation, yAxisID: 'y', order: 1 },
             { label: 'Pianificato (m)', color: CONFIG.colors.courseLine, dashed: true, yAxisID: 'y', order: 2 },
             { label: 'Pendenza (%)', color: CONFIG.colors.slope, yAxisID: 'y1', fill: true, order: 3 }
         ]);
 
         this.charts.climb = new ChartComponent('climb-chart', 'line', [
-            { label: 'VAM (m/h)', color: CONFIG.colors.vam, fill: true }
+            { label: 'Speed (km/h)', color: CONFIG.colors.speed, yAxisID: 'y', fill: false, order: 1 },
+            { label: 'VAM (m/h)', color: CONFIG.colors.vam, yAxisID: 'y1', fill: true, order: 2 }
         ]);
 
         this.charts.powerHr = new ChartComponent('power-hr-chart', 'line', [
@@ -187,7 +188,10 @@ export class DashboardUI {
             ]
         );
 
-        this.charts.climb.update([live], [p => p.vam]);
+        this.charts.climb.update(
+            [live, live],
+            [p => (p.speed || 0) * 3.6, p => p.vam]
+        );
         
         this.charts.powerHr.update(
             [live, live], 
