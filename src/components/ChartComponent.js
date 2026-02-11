@@ -74,7 +74,7 @@ export class ChartComponent {
                     label: ds.label,
                     data: [],
                     borderColor: ds.color || ds.borderColor,
-                    backgroundColor: (ds.color || ds.borderColor) + '11', // Trasparenza
+                    backgroundColor: (ds.color || ds.borderColor) + '33', // Trasparenza
                     borderDash: ds.dashed ? [5, 5] : [],
                     yAxisID: ds.yAxisID || 'y',
                     borderWidth: 2, 
@@ -99,7 +99,8 @@ export class ChartComponent {
                 borderColor: this.color,
                 backgroundColor: this.color + '33',
                 yAxisID: 'y',
-                borderWidth: 2, pointRadius: 0, tension: 0.2, fill: true
+                borderWidth: 2, pointRadius: 0, tension: 0.2, 
+                fill: this.extraOptions.fill !== undefined ? this.extraOptions.fill : false
             });
 
             if (this.extraOptions.label2) {
@@ -110,11 +111,11 @@ export class ChartComponent {
                     label: label2,
                     data: [],
                     borderColor: color2 || '#ccc',
-                    backgroundColor: (color2 || '#ccc') + '11',
+                    backgroundColor: (color2 || '#ccc') + '33',
                     borderDash: dashed2 ? [5, 5] : [],
                     yAxisID: enableY1 ? 'y1' : 'y', 
                     borderWidth: 2, pointRadius: 0, tension: 0.2, 
-                    fill: !dashed2 
+                    fill: false 
                 });
             }
         }

@@ -26,7 +26,7 @@ export class DashboardUI {
                         label: 'Altitudine (m)',
                         color: CONFIG.colors.chartPrimary,
                         yAxisID: 'y',
-                        fill: true,
+                        fill: false,
                         order: 2
                     },
                     // Dataset 1: Altitudine Pianificata (Course - asse Y sx)
@@ -54,7 +54,9 @@ export class DashboardUI {
         this.climbChart = new ChartComponent(
             'climb-chart', 
             'VAM (m/h)', 
-            CONFIG.colors.vam
+            CONFIG.colors.vam,
+            'line',
+            { fill: true }
         );
         
         // Colonna 2
@@ -66,7 +68,8 @@ export class DashboardUI {
             { 
                 label2: 'Heart Rate (bpm)', 
                 color2: CONFIG.colors.hr,
-                dashed2: false 
+                dashed2: false,
+                fill: true
             }
         );
 
