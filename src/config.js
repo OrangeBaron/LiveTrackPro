@@ -17,7 +17,9 @@ export const CONFIG = {
 
     libs: [
         'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
-        'https://cdn.jsdelivr.net/npm/chart.js'
+        'https://cdn.jsdelivr.net/npm/chart.js',
+        'https://cdn.jsdelivr.net/npm/hammerjs@2.0.8', 
+        'https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1'
     ],
     css: [
         'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'
