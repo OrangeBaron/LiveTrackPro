@@ -13,7 +13,7 @@ export class DashboardUI {
         // Colonna 1
         this.mapComponent = new MapComponent('map-container');
         
-        // [MODIFICATO] Configurazione avanzata a 3 dataset per il grafico altimetrico
+        // Configurazione avanzata a 3 dataset per il grafico altimetrico
         this.elevationChart = new ChartComponent(
             'elevation-chart', 
             'Altitudine (m)', 
@@ -44,7 +44,7 @@ export class DashboardUI {
                         color: CONFIG.colors.slope, 
                         dashed: false, 
                         yAxisID: 'y1', 
-                        fill: false,
+                        fill: true,
                         order: 3
                     }
                 ]
