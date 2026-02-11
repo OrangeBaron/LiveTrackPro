@@ -99,13 +99,13 @@ export class StatsEngine {
 
                 this.wPrimeBalance = CyclingPhysics.updateWPrimeBalance(
                     this.wPrimeBalance, 
-                    smoothPower, 
+                    currentWatts, 
                     dt, 
                     this.cp, 
                     CONFIG.athlete.wPrime
                 );
 
-                this._accumulateZones(p.heartRateBeatsPerMin, smoothPower, dt);
+                this._accumulateZones(p.heartRateBeatsPerMin, currentWatts, dt);
             }
 
             // 7. Finalizzazione Punto
