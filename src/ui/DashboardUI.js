@@ -2,133 +2,33 @@ import { CONFIG } from '../config.js';
 import { MapComponent } from '../components/MapComponent.js';
 import { ChartComponent } from '../components/ChartComponent.js';
 import { DASHBOARD_TEMPLATE } from './DashboardTemplate.js';
+import { ViewHelpers } from './ViewHelpers.js'; // Nuovo Import
 
 export class DashboardUI {
     constructor(dataManager) {
         this.dataManager = dataManager;
         this.isInitialized = false;
         
-        // --- Inizializzazione Componenti ---
-    
-        // Colonna 1: Mappa
-        this.mapComponent = new MapComponent('map-container');
-        
-        // 1. ELEVATION CHART (Multi-Dataset: Reale, Pianificato, Pendenza)
-        this.elevationChart = new ChartComponent(
-            'elevation-chart', 
-            'line',
-            [
-                // Dataset 0: Altitudine Reale
-                {
-                    label: 'Altitudine (m)',
-                    color: CONFIG.colors.chartPrimary,
-                    yAxisID: 'y',
-                    fill: false,
-                    order: 1 
-                },
-                // Dataset 1: Altitudine Pianificata
-                { 
-                    label: 'Pianificato (m)', 
-                    color: CONFIG.colors.courseLine, 
-                    dashed: true,
-                    yAxisID: 'y', 
-                    fill: false,
-                    order: 2 
-                },
-                // Dataset 2: Pendenza
-                { 
-                    label: 'Pendenza (%)', 
-                    color: CONFIG.colors.slope, 
-                    yAxisID: 'y1', 
-                    fill: true,
-                    order: 3 
-                }
-            ]
-        );
-        
-        // 2. CLIMB CHART (VAM)
-        this.climbChart = new ChartComponent(
-            'climb-chart', 
-            'line',
-            [
-                { label: 'VAM (m/h)', color: CONFIG.colors.vam, fill: true }
-            ]
-        );
-        
-        // 3. POWER & HR CHART
-        this.powerHrChart = new ChartComponent(
-            'power-hr-chart', 
-            'line',
-            [
-                {
-                    label: 'Power (W)',
-                    color: CONFIG.colors.power,
-                    yAxisID: 'y',
-                    fill: true,
-                    order: 2
-                },
-                {
-                    label: 'Heart Rate (bpm)',
-                    color: CONFIG.colors.hr,
-                    yAxisID: 'y1',
-                    fill: false,
-                    order: 1
-                }
-            ]
-        );
-
-        // 4. ADVANCED CHART (W' & Efficiency)
-        this.advancedChart = new ChartComponent(
-            'advanced-chart', 
-            'line',
-            [
-                {
-                    label: "W' Balance (J)",
-                    color: CONFIG.colors.wPrime,
-                    yAxisID: 'y',
-                    fill: false,
-                    order: 2
-                },
-                {
-                    label: 'Efficiency (Pw/HR)',
-                    color: CONFIG.colors.efficiency,
-                    yAxisID: 'y1',
-                    fill: false,
-                    order: 1
-                }
-            ]
-        ); 
-        
-        // 5. ZONE CHARTS (Bar)
-        this.powerZonesChart = new ChartComponent('power-zones-chart', 'bar', [
-            { label: 'Power Zones', color: CONFIG.colors.powerZones }
-        ]);
-
-        this.hrZonesChart = new ChartComponent('hr-zones-chart', 'bar', [
-            { label: 'HR Zones', color: CONFIG.colors.hrZones }
-        ]);
+        // Componenti (inizializzati nel bootstrap)
+        this.mapComponent = null;
+        this.charts = {}; 
     }
 
+    /**
+     * Entry point: Carica risorse, prepara il DOM e avvia i componenti
+     */
     async bootstrap() {
         if (this.isInitialized) return;
         
-        await this.loadResources();
-
-        const meta = this.extractPageMetadata();
+        await this._loadResources();
         
-        this.cleanOriginalUI();
-        this.renderStructure(meta);
+        const meta = this._extractPageMetadata();
+        this._cleanOriginalUI();
+        this._renderStructure(meta);
         
-        // Init dei chart sui canvas appena creati
-        this.mapComponent.init();
-        this.elevationChart.init();
-        this.climbChart.init();
-        this.powerHrChart.init();
-        this.advancedChart.init();
-        this.powerZonesChart.init();
-        this.hrZonesChart.init(); 
+        this._initComponents();
         
-        // Sottoscrizione agli aggiornamenti
+        // Sottoscrizione agli aggiornamenti del DataManager
         this.dataManager.subscribe(data => this.refresh(data));
         
         this.isInitialized = true;
@@ -140,7 +40,241 @@ export class DashboardUI {
         }
     }
 
-    loadResources() {
+    /**
+     * Metodo principale di aggiornamento chiamato dal DataManager
+     */
+    refresh(data) {
+        const { live, course, stats, hrZones, powerZones } = data;
+
+        if (!live || live.length === 0) return;
+        const lastPoint = live[live.length - 1];
+
+        // 1. Aggiorna Log Stato
+        this._updateStatusLog(lastPoint, live.length);
+
+        // 2. Aggiorna Metriche "Live" (Box colorati)
+        this._updateLiveMetrics(lastPoint, stats);
+
+        // 3. Aggiorna Summary Bar (Totali)
+        this._updateSummaryBar(stats);
+
+        // 4. Aggiorna Mappa
+        this.mapComponent.update(live, course);
+
+        // 5. Aggiorna Grafici
+        this._updateCharts(live, course, hrZones, powerZones);
+    }
+
+    // --- SEZIONE SETUP DOM ---
+
+    _renderStructure(meta) {
+        const container = document.createElement('div');
+        container.id = 'livetrack-pro-dashboard';
+        
+        // Generazione HTML dinamico usando il template
+        // Nota: Qui potremmo ottimizzare ulteriormente, ma per ora teniamo la logica esistente
+        const metricsHtml = this._buildMetricsHtml();
+        const summaryHtml = this._buildSummaryHtml();
+
+        let finalHtml = DASHBOARD_TEMPLATE
+            .replace('{{ATHLETE_NAME}}', meta.name)
+            .replace('{{SESSION_INFO}}', meta.info)
+            .replace('{{METRICS_GRID}}', metricsHtml)
+            .replace('{{SUMMARY_BAR}}', summaryHtml)
+            .replace('{{COLOR_WPRIME}}', CONFIG.colors.wPrime)
+            .replace('{{COLOR_EFFICIENCY}}', CONFIG.colors.efficiency);
+
+        container.innerHTML = finalHtml;
+        document.body.appendChild(container);
+    }
+
+    _initComponents() {
+        // Mappa
+        this.mapComponent = new MapComponent('map-container');
+        this.mapComponent.init();
+
+        // Grafici
+        this.charts.elevation = new ChartComponent('elevation-chart', 'line', [
+            { label: 'Altitudine (m)', color: CONFIG.colors.chartPrimary, yAxisID: 'y', order: 1 },
+            { label: 'Pianificato (m)', color: CONFIG.colors.courseLine, dashed: true, yAxisID: 'y', order: 2 },
+            { label: 'Pendenza (%)', color: CONFIG.colors.slope, yAxisID: 'y1', fill: true, order: 3 }
+        ]);
+
+        this.charts.climb = new ChartComponent('climb-chart', 'line', [
+            { label: 'VAM (m/h)', color: CONFIG.colors.vam, fill: true }
+        ]);
+
+        this.charts.powerHr = new ChartComponent('power-hr-chart', 'line', [
+            { label: 'Power (W)', color: CONFIG.colors.power, yAxisID: 'y', fill: true, order: 2 },
+            { label: 'Heart Rate (bpm)', color: CONFIG.colors.hr, yAxisID: 'y1', order: 1 }
+        ]);
+
+        this.charts.advanced = new ChartComponent('advanced-chart', 'line', [
+            { label: "W' Balance (J)", color: CONFIG.colors.wPrime, yAxisID: 'y', order: 2 },
+            { label: 'Efficiency (Pw/HR)', color: CONFIG.colors.efficiency, yAxisID: 'y1', order: 1 }
+        ]);
+
+        this.charts.powerZones = new ChartComponent('power-zones-chart', 'bar', [
+            { label: 'Power Zones', color: CONFIG.colors.powerZones }
+        ]);
+
+        this.charts.hrZones = new ChartComponent('hr-zones-chart', 'bar', [
+            { label: 'HR Zones', color: CONFIG.colors.hrZones }
+        ]);
+
+        // Inizializza tutti i chart
+        Object.values(this.charts).forEach(c => c.init());
+    }
+
+    // --- SEZIONE AGGIORNAMENTI UI ---
+
+    _updateStatusLog(lastPoint, count) {
+        const timeStr = ViewHelpers.formatTime(lastPoint.dateTime);
+        const el = document.getElementById('status-log');
+        if (el) el.innerHTML = `<strong>UPDATED:</strong> ${timeStr} &bull; <strong>PTS:</strong> ${count}`;
+    }
+
+    _updateLiveMetrics(p, stats) {
+        // Helper interno per brevità
+        const setTxt = (id, val) => {
+            const el = document.getElementById(id);
+            if (el) el.innerText = val;
+        };
+
+        setTxt('live-speed', p.speed ? ViewHelpers.formatNumber(p.speed * 3.6, 1) : '-');
+        setTxt('live-power', ViewHelpers.formatInt(p.powerWatts));
+        setTxt('live-cadence', ViewHelpers.formatInt(p.cadenceCyclesPerMin));
+        setTxt('live-hr', ViewHelpers.formatInt(p.heartRateBeatsPerMin));
+        
+        // Dati derivati dallo StatsEngine
+        setTxt('live-gradient', ViewHelpers.formatNumber(stats?.gradient, 1));
+        setTxt('live-vam', ViewHelpers.formatInt(stats?.vam));
+    }
+
+    _updateSummaryBar(stats) {
+        if (!stats) return;
+
+        const setTxt = (id, val) => {
+            const el = document.getElementById(id);
+            if (el) el.innerText = val;
+        };
+
+        setTxt('summary-time', stats.duration);
+        setTxt('summary-distance', stats.distance);
+        setTxt('summary-elevation', stats.elevationGain ? `+${Math.round(stats.elevationGain)}` : '0');
+        
+        setTxt('summary-np', ViewHelpers.formatInt(stats.np));
+        setTxt('summary-if', stats.if);
+        setTxt('summary-tss', ViewHelpers.formatInt(stats.tss));
+        setTxt('summary-work', ViewHelpers.formatInt(stats.workKj));
+
+        const weatherEl = document.getElementById('summary-weather');
+        if (weatherEl) {
+            weatherEl.innerHTML = ViewHelpers.getWeatherHtml(stats.weather);
+        }
+    }
+
+    _updateCharts(live, course, hrZones, powerZones) {
+        // Line Charts
+        const courseData = (course && course.length > 0) ? course : [];
+        
+        this.charts.elevation.update(
+            [live, courseData, live], 
+            [
+                p => (p.altitude ?? p.elevation), // Reale
+                p => (p.altitude ?? p.elevation), // Pianificato
+                p => p.gradient                   // Pendenza
+            ]
+        );
+
+        this.charts.climb.update([live], [p => p.vam]);
+        
+        this.charts.powerHr.update(
+            [live, live], 
+            [p => p.powerSmooth, p => p.heartRateBeatsPerMin]
+        );
+
+        this.charts.advanced.update(
+            [live, live], 
+            [p => p.wPrimeBal, p => p.efficiency]
+        );
+
+        // Bar Charts
+        if (powerZones) {
+            this.charts.powerZones.update(powerZones, ['Z1', 'Z2', 'Z3', 'Z4', 'Z5', 'Z6', 'Z7']);
+        }
+        if (hrZones) {
+            this.charts.hrZones.update(hrZones, ['Z1', 'Z2', 'Z3', 'Z4', 'Z5']);
+        }
+    }
+
+    // --- UTILS & HELPERS ---
+
+    _createMetricBox(id, label, unit, colorClass) {
+        return `<div class="ltp-metric-box ${colorClass}">
+            <div class="ltp-metric-label">${label}</div>
+            <div class="ltp-metric-value-group">
+                <span id="live-${id}" class="ltp-value">--</span>
+                <span class="ltp-unit">${unit}</span>
+            </div>
+        </div>`;
+    }
+
+    _createSummaryItem(id, label, unit) {
+        return `<div class="ltp-summary-item">
+            <div class="ltp-summary-label">${label}</div>
+            <div>
+                <span id="summary-${id}" class="ltp-summary-value">--</span>
+                <span class="ltp-summary-unit">${unit}</span>
+            </div>
+        </div>`;
+    }
+
+    _buildMetricsHtml() {
+        return [
+            this._createMetricBox('speed', 'Speed', 'km/h', 'border-blue'),
+            this._createMetricBox('power', 'Power', 'W', 'border-orange'),
+            this._createMetricBox('hr', 'Heart Rate', 'bpm', 'border-red'),
+            this._createMetricBox('cadence', 'Cadence', 'rpm', 'border-purple'),
+            this._createMetricBox('gradient', 'Gradient', '%', 'border-grad'),
+            this._createMetricBox('vam', 'V.A.M.', 'm/h', 'border-vam')
+        ].join('');
+    }
+
+    _buildSummaryHtml() {
+        return [
+            this._createSummaryItem('time', 'Time', ''),
+            this._createSummaryItem('distance', 'Distance', 'km'),
+            this._createSummaryItem('elevation', 'Ascent', 'm'),
+            this._createSummaryItem('np', 'Norm. Pwr', 'W'),
+            this._createSummaryItem('if', 'Intensity', 'IF'),
+            this._createSummaryItem('tss', 'TSS', 'pts'),
+            this._createSummaryItem('work', 'Work', 'kJ'),
+            this._createSummaryItem('weather', 'Live Weather', '')
+        ].join('');
+    }
+
+    _extractPageMetadata() {
+        try {
+            const nameEl = document.querySelector("div[class*='AthleteDetails'] strong") 
+                        || document.querySelector("strong[id*=':r']");
+            const sessionEl = document.querySelector("div[class*='SessionInfo'] span[title]");
+            return {
+                name: nameEl ? nameEl.innerText.trim() : 'Live Track Pro',
+                info: sessionEl ? sessionEl.getAttribute('title') : 'Analytics'
+            };
+        } catch (e) {
+            return { name: 'Live Track Pro', info: 'Analytics' };
+        }
+    }
+
+    _cleanOriginalUI() {
+        Array.from(document.body.children).forEach(child => {
+            if (child.tagName !== 'SCRIPT') child.style.display = 'none';
+        });
+    }
+
+    _loadResources() {
         const head = document.head;
         CONFIG.css.forEach(href => {
             const link = document.createElement('link');
@@ -156,181 +290,5 @@ export class DashboardUI {
             });
         });
         return Promise.all(scripts);
-    }
-
-    extractPageMetadata() {
-        try {
-            const nameEl = document.querySelector("div[class*='AthleteDetails'] strong") 
-                        || document.querySelector("strong[id*=':r']");
-            
-            const sessionEl = document.querySelector("div[class*='SessionInfo'] span[title]");
-
-            return {
-                name: nameEl ? nameEl.innerText.trim() : 'Live Track Pro',
-                info: sessionEl ? sessionEl.getAttribute('title') : 'Analytics'
-            };
-        } catch (e) {
-            console.warn("LiveTrackPro: Impossibile estrarre metadati pagina", e);
-            return { name: 'Live Track Pro', info: 'Analytics' };
-        }
-    }
-
-    cleanOriginalUI() {
-        Array.from(document.body.children).forEach(child => {
-            if (child.tagName !== 'SCRIPT') child.style.display = 'none';
-        });
-    }
-
-    renderStructure(meta) {
-        const container = document.createElement('div');
-        container.id = 'livetrack-pro-dashboard';
-        
-        const metricsHtml = [
-            this.createMetricBox('speed', 'Speed', 'km/h', 'border-blue'),
-            this.createMetricBox('power', 'Power', 'W', 'border-orange'),
-            this.createMetricBox('hr', 'Heart Rate', 'bpm', 'border-red'),
-            this.createMetricBox('cadence', 'Cadence', 'rpm', 'border-purple'),
-            this.createMetricBox('gradient', 'Gradient', '%', 'border-grad'),
-            this.createMetricBox('vam', 'V.A.M.', 'm/h', 'border-vam')
-        ].join('');
-
-        const summaryHtml = [
-            this.createSummaryItem('time', 'Time', ''),
-            this.createSummaryItem('distance', 'Distance', 'km'),
-            this.createSummaryItem('elevation', 'Ascent', 'm'),
-            this.createSummaryItem('np', 'Norm. Pwr', 'W'),
-            this.createSummaryItem('if', 'Intensity', 'IF'),
-            this.createSummaryItem('tss', 'TSS', 'pts'),
-            this.createSummaryItem('work', 'Work', 'kJ'),
-            this.createSummaryItem('weather', 'Live Weather', '')
-        ].join('');
-
-        let finalHtml = DASHBOARD_TEMPLATE
-            .replace('{{ATHLETE_NAME}}', meta.name)
-            .replace('{{SESSION_INFO}}', meta.info)
-            .replace('{{METRICS_GRID}}', metricsHtml)
-            .replace('{{SUMMARY_BAR}}', summaryHtml)
-            .replace('{{COLOR_WPRIME}}', CONFIG.colors.wPrime)
-            .replace('{{COLOR_EFFICIENCY}}', CONFIG.colors.efficiency);
-
-        container.innerHTML = finalHtml;
-        document.body.appendChild(container);
-    }
-
-    createMetricBox(id, label, unit, colorClass) {
-        return `
-            <div class="ltp-metric-box ${colorClass}">
-                <div class="ltp-metric-label">${label}</div>
-                <div class="ltp-metric-value-group">
-                    <span id="live-${id}" class="ltp-value">--</span>
-                    <span class="ltp-unit">${unit}</span>
-                </div>
-            </div>`;
-    }
-
-    createSummaryItem(id, label, unit) {
-        return `
-            <div class="ltp-summary-item">
-                <div class="ltp-summary-label">${label}</div>
-                <div>
-                    <span id="summary-${id}" class="ltp-summary-value">--</span>
-                    <span class="ltp-summary-unit">${unit}</span>
-                </div>
-            </div>`;
-    }
-
-    getWindArrow(deg) {
-        const arrows = ['⬆', '↗', '➡', '↘', '⬇', '↙', '⬅', '↖'];
-        return arrows[Math.round(deg / 45) % 8];
-    }
-
-    refresh({ live, course, hrZones, powerZones, stats }) {
-        if (!live || live.length === 0) return;
-        const lastPoint = live[live.length - 1];
-
-        const timeStr = new Date(lastPoint.dateTime).toLocaleTimeString([], { 
-            hour: '2-digit', minute: '2-digit', second: '2-digit' 
-        });
-        document.getElementById('status-log').innerHTML = 
-            `<strong>UPDATED:</strong> ${timeStr} &bull; <strong>PTS:</strong> ${live.length}`;
-
-        this.updateTextMetric('live-speed', lastPoint.speed ? (lastPoint.speed * 3.6).toFixed(1) : '-');
-        this.updateTextMetric('live-power', lastPoint.powerWatts || '-');
-        this.updateTextMetric('live-cadence', lastPoint.cadenceCyclesPerMin || '-');
-        this.updateTextMetric('live-hr', lastPoint.heartRateBeatsPerMin || '-');
-        this.updateTextMetric('live-gradient', stats && stats.gradient !== undefined ? stats.gradient : '-');
-        this.updateTextMetric('live-vam', stats && stats.vam !== undefined ? stats.vam : '-');
-
-        if (stats) {
-            this.updateTextMetric('summary-time', stats.duration || '00:00:00');
-            this.updateTextMetric('summary-distance', stats.distance || '0.0');
-            this.updateTextMetric('summary-elevation', stats.elevationGain ? `+${Math.round(stats.elevationGain)}` : '0');
-            this.updateTextMetric('summary-np', stats.np || '-');
-            this.updateTextMetric('summary-if', stats.if || '-');
-            this.updateTextMetric('summary-tss', stats.tss || '0');
-            this.updateTextMetric('summary-work', stats.workKj || '-');
-
-            if (stats.weather) {
-                const w = stats.weather;
-                const icon = (w.description || '').includes('pioggia') ? '🌧️' : ((w.description || '').includes('nubi') ? '☁️' : '☀️');
-                const arrow = this.getWindArrow(w.windDeg);
-                const html = `${w.temp}° <small>${icon}</small> <small style="color:#666; font-size:14px; margin-left:5px;">${arrow} ${w.windSpeed}</small>`;
-                const el = document.getElementById('summary-weather');
-                if (el) el.innerHTML = html;
-            } else {
-                const el = document.getElementById('summary-weather');
-                if(el) el.innerHTML = '<span style="font-size:12px; color:#ccc;">No API Key</span>';
-            }
-        }
-
-        this.mapComponent.update(live, course);
-        
-        // --- REFACTORING: UPDATE GRAFICI LINEARI ---
-        const sourceRealAlt = live;
-        const sourceCourseAlt = (course && course.length > 0) ? course : []; 
-
-        this.elevationChart.update(
-            [sourceRealAlt, sourceCourseAlt, live], // Sorgenti dati
-            [
-                p => (p.altitude !== undefined ? p.altitude : p.elevation), // Extractor 1 (Reale)
-                p => (p.altitude !== undefined ? p.altitude : p.elevation), // Extractor 2 (Pianificato)
-                p => p.gradient                                             // Extractor 3 (Pendenza)
-            ]
-        );
-
-        this.climbChart.update(
-            [live], 
-            [p => p.vam]
-        );
-
-        this.powerHrChart.update(
-            [live, live], 
-            [p => p.powerSmooth, p => p.heartRateBeatsPerMin]
-        );
-
-        this.advancedChart.update(
-            [live, live], 
-            [p => p.wPrimeBal, p => p.efficiency]
-        );
-        
-        // --- REFACTORING: UPDATE GRAFICI A BARRE (con etichette) ---
-        if (powerZones) {
-            this.powerZonesChart.update(
-                powerZones, 
-                ['Z1', 'Z2', 'Z3', 'Z4', 'Z5', 'Z6', 'Z7'] // Labels per l'asse X
-            );
-        }
-        
-        if (hrZones) {
-            this.hrZonesChart.update(
-                hrZones, 
-                ['Z1', 'Z2', 'Z3', 'Z4', 'Z5'] // Labels per l'asse X
-            );
-        }
-    }
-
-    updateTextMetric(id, value) {
-        const el = document.getElementById(id);
-        if (el) el.innerText = value;
     }
 }
