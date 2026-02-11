@@ -111,7 +111,7 @@ export class DashboardUI {
         ]);
 
         this.charts.advanced = new ChartComponent('advanced-chart', 'line', [
-            { label: "W' Balance (J)", color: CONFIG.colors.wPrime, yAxisID: 'y', order: 2 },
+            { label: "W' Balance (J)", color: CONFIG.colors.wPrime, yAxisID: 'y', fill: 'end', order: 2 },
             { label: 'Efficiency (Pw/HR)', color: CONFIG.colors.efficiency, yAxisID: 'y1', order: 1 }
         ]);
 
