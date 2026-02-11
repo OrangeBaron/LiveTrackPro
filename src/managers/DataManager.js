@@ -1,6 +1,7 @@
 import { getDistanceFromLatLonInMeters, calculateVam, calculateGradient, formatDuration } from '../utils/helpers.js';
 import { CONFIG } from '../config.js';
 import { WeatherManager } from './WeatherManager.js';
+import { ElevationManager } from './ElevationManager.js'; // [NUOVO]
 import { CyclingPhysics } from '../utils/CyclingPhysics.js';
 
 export class DataManager {
@@ -33,6 +34,7 @@ export class DataManager {
         
         this.listeners = [];
         this.weatherManager = new WeatherManager(() => this.notify());
+        this.elevationManager = new ElevationManager(); // [NUOVO]
     }
 
     resetAccumulators() {
@@ -92,12 +94,12 @@ export class DataManager {
         }));
     }
 
-    ingestCourse(data) {
+    // Ora è asincrono per gestire il fetch dell'elevazione
+    async ingestCourse(data) {
         // 1. Estrazione Array Punti: Gestiamo la struttura annidata "courses[0].coursePoints"
         let rawPoints = [];
         
         if (data.courses && data.courses.length > 0 && data.courses[0].coursePoints) {
-            // Nuova struttura rilevata dal tuo JSON
             rawPoints = data.courses[0].coursePoints;
         } else {
             // Fallback per strutture legacy o differenti endpoint
@@ -109,7 +111,6 @@ export class DataManager {
 
         rawPoints.forEach((p, i) => {
             // 2. Estrazione Coordinate: Gestiamo l'oggetto "position"
-            // Se c'è p.position usiamo quello, altrimenti cerchiamo lat/latitude direttamente
             const pos = p.position || p;
             const lat = pos.lat || pos.latitude;
             const lon = pos.lon || pos.longitude;
@@ -141,9 +142,17 @@ export class DataManager {
             this.coursePoints.push({ lat, lon, altitude: ele, totalDistanceMeters: dist });
         });
 
-        console.log(`LiveTrackPro: Course ingested with ${this.coursePoints.length} points.`);
+        console.log(`LiveTrackPro: Course ingested locally with ${this.coursePoints.length} points.`);
         
         this.hasReceivedCourses = true;
+        
+        // Disegna subito la mappa (con altitudine piatta se mancante)
+        this.notify();
+
+        // 3. FETCH ELEVAZIONE (Se necessario)
+        this.coursePoints = await this.elevationManager.enrichCoursePoints(this.coursePoints);
+        
+        // Aggiorna il grafico altimetrico con i dati nuovi
         this.notify();
     }
 

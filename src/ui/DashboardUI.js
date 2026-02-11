@@ -13,15 +13,41 @@ export class DashboardUI {
         // Colonna 1
         this.mapComponent = new MapComponent('map-container');
         
+        // [MODIFICATO] Configurazione avanzata a 3 dataset per il grafico altimetrico
         this.elevationChart = new ChartComponent(
             'elevation-chart', 
             'Altitudine (m)', 
             CONFIG.colors.chartPrimary,
-            'dual-line',
+            'line',
             { 
-                label2: 'Pendenza (%)', 
-                color2: CONFIG.colors.slope,
-                dashed2: true 
+                datasetsConfig: [
+                    // Dataset 0: Altitudine Reale (Default - asse Y sx)
+                    {
+                        label: 'Altitudine (m)',
+                        color: CONFIG.colors.chartPrimary,
+                        yAxisID: 'y',
+                        fill: true,
+                        order: 2
+                    },
+                    // Dataset 1: Altitudine Pianificata (Course - asse Y sx)
+                    { 
+                        label: 'Pianificato (m)', 
+                        color: CONFIG.colors.courseLine, 
+                        dashed: true,
+                        yAxisID: 'y', 
+                        fill: false,
+                        order: 1
+                    },
+                    // Dataset 2: Pendenza (Gradient - asse Y1 dx)
+                    { 
+                        label: 'Pendenza (%)', 
+                        color: CONFIG.colors.slope, 
+                        dashed: false, 
+                        yAxisID: 'y1', 
+                        fill: false,
+                        order: 3
+                    }
+                ]
             }
         );
         
@@ -71,7 +97,6 @@ export class DashboardUI {
         const meta = this.extractPageMetadata();
         
         this.cleanOriginalUI();
-        // NOTA: injectCustomStyles è stato rimosso in favore del CSS statico
         this.renderStructure(meta);
         
         // Init dei chart sui canvas appena creati
@@ -240,55 +265,43 @@ export class DashboardUI {
 
         this.mapComponent.update(live, course);
         
-        // --- GESTIONE GRAFICO ALTIMETRIA ---
-        // Se c'è un percorso pianificato (course), confrontiamo Altitudine Reale vs Prevista.
-        // Se non c'è, manteniamo Altitudine Reale vs Pendenza.
+        // --- GESTIONE GRAFICO ALTIMETRIA (AGGIORNATO) ---
+        // Passiamo 3 dataset espliciti: 
+        // 1. Live -> Altitudine Reale
+        // 2. Course -> Altitudine Pianificata (se presente)
+        // 3. Live -> Pendenza
         
-        const hasCourse = course && course.length > 0;
-        
-        if (hasCourse) {
-            // MODALITÀ: REALE vs PIANIFICATO
-            this.elevationChart.updateSecondaryConfig(
-                'Pianificato (m)',
-                CONFIG.colors.courseLine,
-                true,
-                false
+        const sourceRealAlt = live;
+        const sourceCourseAlt = (course && course.length > 0) ? course : []; // Usa course solo se esiste
+        const sourceGradient = live;
 
-            );
-
-            this.elevationChart.update(
-                live,
-                course,
-                p => (p.altitude !== undefined ? p.altitude : p.elevation),
-                p => (p.altitude !== undefined ? p.altitude : p.elevation)
-            );
-        } else {
-            // MODALITÀ: REALE vs PENDENZA (Default)
-            this.elevationChart.updateSecondaryConfig(
-                'Pendenza (%)', 
-                CONFIG.colors.slope, 
-                false,
-                true
-            );
-
-            this.elevationChart.update(
-                live,
-                live,
-                p => (p.altitude !== undefined ? p.altitude : p.elevation), 
-                p => p.gradient
-            );
-        }
-
-        this.climbChart.update(
-            live, 
-            null,
-            p => p.vam,
-            null
+        this.elevationChart.update(
+            [sourceRealAlt, sourceCourseAlt, sourceGradient],
+            [
+                p => (p.altitude !== undefined ? p.altitude : p.elevation), // Estrattore 1 (Reale)
+                p => (p.altitude !== undefined ? p.altitude : p.elevation), // Estrattore 2 (Pianificato)
+                p => p.gradient                                             // Estrattore 3 (Pendenza)
+            ]
         );
 
-        this.powerHrChart.update(live, null, p => p.powerSmooth, p => p.heartRateBeatsPerMin);
+        // --- AGGIORNAMENTO ALTRI GRAFICI LINEARI ---
+        
+        this.climbChart.update(
+            [live], 
+            [p => p.vam]
+        );
 
-        this.advancedChart.update(live, null, p => p.wPrimeBal, p => p.efficiency);
+        this.powerHrChart.update(
+            [live, live], 
+            [p => p.powerSmooth, p => p.heartRateBeatsPerMin]
+        );
+
+        this.advancedChart.update(
+            [live, live], 
+            [p => p.wPrimeBal, p => p.efficiency]
+        );
+        
+        // I grafici a barre usano logica diversa
         if (powerZones) this.powerZonesChart.update(powerZones);
         if (hrZones) this.hrZonesChart.update(hrZones);
     }

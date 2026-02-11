@@ -25,7 +25,8 @@
   },
   "host_permissions": [
     "https://livetrack.garmin.com/*",
-    "https://api.openweathermap.org/*"
+    "https://api.openweathermap.org/*",
+    "https://api.open-meteo.com/*"
   ],
   "web_accessible_resources": [
     {
