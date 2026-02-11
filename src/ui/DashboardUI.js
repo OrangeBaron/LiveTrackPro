@@ -9,11 +9,11 @@ export class DashboardUI {
         this.isInitialized = false;
         
         // --- Inizializzazione Componenti ---
-        
+    
         // Colonna 1
         this.mapComponent = new MapComponent('map-container');
         
-        // Configurazione avanzata a 3 dataset per il grafico altimetrico
+        // 1. ELEVATION CHART
         this.elevationChart = new ChartComponent(
             'elevation-chart', 
             'Altitudine (m)', 
@@ -21,31 +21,31 @@ export class DashboardUI {
             'line',
             { 
                 datasetsConfig: [
-                    // Dataset 0: Altitudine Reale (Default - asse Y sx)
+                    // Dataset 0: Altitudine Reale
                     {
                         label: 'Altitudine (m)',
                         color: CONFIG.colors.chartPrimary,
                         yAxisID: 'y',
                         fill: false,
-                        order: 2
+                        order: 1 
                     },
-                    // Dataset 1: Altitudine Pianificata (Course - asse Y sx)
+                    // Dataset 1: Altitudine Pianificata
                     { 
                         label: 'Pianificato (m)', 
                         color: CONFIG.colors.courseLine, 
                         dashed: true,
                         yAxisID: 'y', 
                         fill: false,
-                        order: 1
+                        order: 2 
                     },
-                    // Dataset 2: Pendenza (Gradient - asse Y1 dx)
+                    // Dataset 2: Pendenza
                     { 
                         label: 'Pendenza (%)', 
                         color: CONFIG.colors.slope, 
                         dashed: false, 
                         yAxisID: 'y1', 
                         fill: true,
-                        order: 3
+                        order: 3 
                     }
                 ]
             }
@@ -59,26 +59,61 @@ export class DashboardUI {
             { fill: true }
         );
         
-        // Colonna 2
+        // 2. POWER & HR CHART
         this.powerHrChart = new ChartComponent(
             'power-hr-chart', 
             'Power (W)', 
             CONFIG.colors.power,
-            'dual-line',
+            'line',
             { 
-                label2: 'Heart Rate (bpm)', 
-                color2: CONFIG.colors.hr,
-                dashed2: false,
-                fill: true
+                datasetsConfig: [
+                    // Dataset 0: Power
+                    {
+                        label: 'Power (W)',
+                        color: CONFIG.colors.power,
+                        yAxisID: 'y',
+                        fill: true,
+                        order: 2
+                    },
+                    // Dataset 1: Heart Rate
+                    {
+                        label: 'Heart Rate (bpm)',
+                        color: CONFIG.colors.hr,
+                        yAxisID: 'y1',
+                        fill: false,
+                        order: 1
+                    }
+                ]
             }
         );
 
+        // 3. ADVANCED CHART
         this.advancedChart = new ChartComponent(
             'advanced-chart', 
             "W' Balance (J)", 
             CONFIG.colors.wPrime, 
-            'dual-line',
-            { label2: 'Efficiency (Pw/HR)', color2: CONFIG.colors.efficiency, dashed2: true }
+            'line',
+            { 
+                datasetsConfig: [
+                    // Dataset 0: W' Balance
+                    {
+                        label: "W' Balance (J)",
+                        color: CONFIG.colors.wPrime,
+                        yAxisID: 'y',
+                        fill: false,
+                        order: 2
+                    },
+                    // Dataset 1: Efficiency
+                    {
+                        label: 'Efficiency (Pw/HR)',
+                        color: CONFIG.colors.efficiency,
+                        yAxisID: 'y1',
+                        dashed: true,
+                        fill: false,
+                        order: 1
+                    }
+                ]
+            }
         ); 
         
         this.powerZonesChart = new ChartComponent('power-zones-chart', 'Power Zones', '', 'bar', {
@@ -144,7 +179,7 @@ export class DashboardUI {
     extractPageMetadata() {
         try {
             const nameEl = document.querySelector("div[class*='AthleteDetails'] strong") 
-                           || document.querySelector("strong[id*=':r']");
+                        || document.querySelector("strong[id*=':r']");
             
             const sessionEl = document.querySelector("div[class*='SessionInfo'] span[title]");
 
@@ -268,27 +303,23 @@ export class DashboardUI {
 
         this.mapComponent.update(live, course);
         
-        // --- GESTIONE GRAFICO ALTIMETRIA (AGGIORNATO) ---
-        // Passiamo 3 dataset espliciti: 
-        // 1. Live -> Altitudine Reale
-        // 2. Course -> Altitudine Pianificata (se presente)
-        // 3. Live -> Pendenza
-        
+        // --- GESTIONE GRAFICO ALTIMETRIA ---
+        // Dataset index: 0=Reale, 1=Planned, 2=Slope
         const sourceRealAlt = live;
-        const sourceCourseAlt = (course && course.length > 0) ? course : []; // Usa course solo se esiste
+        const sourceCourseAlt = (course && course.length > 0) ? course : []; 
         const sourceGradient = live;
 
         this.elevationChart.update(
             [sourceRealAlt, sourceCourseAlt, sourceGradient],
             [
-                p => (p.altitude !== undefined ? p.altitude : p.elevation), // Estrattore 1 (Reale)
-                p => (p.altitude !== undefined ? p.altitude : p.elevation), // Estrattore 2 (Pianificato)
-                p => p.gradient                                             // Estrattore 3 (Pendenza)
+                p => (p.altitude !== undefined ? p.altitude : p.elevation), // Extractor 1 (Reale)
+                p => (p.altitude !== undefined ? p.altitude : p.elevation), // Extractor 2 (Pianificato)
+                p => p.gradient                                             // Extractor 3 (Pendenza)
             ]
         );
 
-        // --- AGGIORNAMENTO ALTRI GRAFICI LINEARI ---
-        
+        // --- GESTIONE GRAFICO POWER & HR ---
+        // Dataset index: 0=Power, 1=HR
         this.climbChart.update(
             [live], 
             [p => p.vam]
@@ -299,12 +330,13 @@ export class DashboardUI {
             [p => p.powerSmooth, p => p.heartRateBeatsPerMin]
         );
 
+        // --- GESTIONE GRAFICO ADVANCED ---
+        // Dataset index: 0=W', 1=Efficiency
         this.advancedChart.update(
             [live, live], 
             [p => p.wPrimeBal, p => p.efficiency]
         );
         
-        // I grafici a barre usano logica diversa
         if (powerZones) this.powerZonesChart.update(powerZones);
         if (hrZones) this.hrZonesChart.update(hrZones);
     }
