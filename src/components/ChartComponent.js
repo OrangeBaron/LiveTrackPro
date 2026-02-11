@@ -1,3 +1,5 @@
+import { formatDuration } from '../utils/helpers.js'; // <--- 1. NUOVO IMPORT
+
 export class ChartComponent {
     constructor(canvasId, type = 'line', config = []) {
         this.canvasId = canvasId;
@@ -19,6 +21,24 @@ export class ChartComponent {
             interaction: { mode: 'nearest', axis: 'x', intersect: false },
             plugins: { 
                 legend: { display: false },
+                tooltip: {
+                    callbacks: {
+label: (context) => {
+                            let label = context.dataset.label || '';
+                            if (label) {
+                                label += ': ';
+                            }
+                            if (isBar) {
+                                label += formatDuration(context.parsed.y * 1000);
+                            } else {
+                                label += context.parsed.y.toLocaleString('it-IT', { 
+                                    maximumFractionDigits: 2 
+                                });
+                            }
+                            return label;
+                        }
+                    }
+                },
                 zoom: {
                     limits: {
                         x: { min: 'original', max: 'original', minRange: 0.5 }
@@ -56,11 +76,11 @@ export class ChartComponent {
                     },
                     ticks: {
                         color: '#666',
-                        font: { size: 10 }
+                        font: { size: 10 },
                     }
                 },
                 y1: { 
-                    display: false, // Attivato dinamicamente se necessario
+                    display: false, 
                     position: 'right', 
                     grid: { drawOnChartArea: false },
                     ticks: {
