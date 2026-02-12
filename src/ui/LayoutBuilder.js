@@ -11,22 +11,32 @@ export class LayoutBuilder {
         return meta;
     }
 
-    _loadResources() {
+    async _loadResources() {
         const head = document.head;
+
+        // 1. Carica CSS
         CONFIG.css.forEach(href => {
             const link = document.createElement('link');
             link.rel = 'stylesheet'; link.href = href;
             head.appendChild(link);
         });
 
-        const scripts = CONFIG.libs.map(src => {
-            return new Promise((resolve, reject) => {
+        // 2. Carica JS in sequenza
+        for (const src of CONFIG.libs) {
+            await new Promise((resolve, reject) => {
                 const s = document.createElement('script');
-                s.src = src; s.onload = resolve; s.onerror = reject;
+                s.src = src;
+                s.async = false; 
+                s.onload = () => {
+                    resolve();
+                };
+                s.onerror = (e) => {
+                    console.error(`LiveTrackPro: Failed to load ${src}`, e);
+                    reject(e);
+                };
                 head.appendChild(s);
             });
-        });
-        return Promise.all(scripts);
+        }
     }
 
     _extractPageMetadata() {

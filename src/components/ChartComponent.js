@@ -6,12 +6,15 @@ export class ChartComponent {
         this.type = type; 
         this.datasetsConfig = config;
         this.chart = null;
+        
+        // Stato per la gestione dello zoom/scroll
         this.lastKnownMaxX = 0; 
     }
 
     init() {
         if (typeof Chart === 'undefined') return;
 
+        // Registrazione esplicita del plugin
         if (window.ChartZoom && typeof Chart.register === 'function') {
             Chart.register(window.ChartZoom);
         }
@@ -97,7 +100,6 @@ export class ChartComponent {
             commonOptions.plugins.zoom = false;
         }
 
-        // --- Preparazione Datasets ---
         const datasets = this.datasetsConfig.map(cfg => {
             const bgColor = isBar ? cfg.color : (cfg.color + '33');
             return {
@@ -157,7 +159,7 @@ export class ChartComponent {
             }
         });
 
-        // 2. Calcola o usa Max X
+        // 2. Calcola Max X
         if (maxDistance !== null && maxDistance > 0) {
             calculatedMaxX = maxDistance;
         } else {
@@ -169,23 +171,33 @@ export class ChartComponent {
             });
         }
         
-        // 3. Gestione Zoom & Sticky Edge
+        // 3. Logica Zoom & Scroll
         if (this.chart.options.plugins.zoom && calculatedMaxX > 0) {
             const zoomOpts = this.chart.options.plugins.zoom;
-
             zoomOpts.limits.x.max = calculatedMaxX;
 
-            const currentScaleMax = this.chart.scales.x.max;
+            const scale = this.chart.scales.x;
+            const currentMin = scale.min;
+            const currentMax = scale.max;
+            const tolerance = 0.2; 
+            const isAtRightEdge = (this.lastKnownMaxX === 0) || (currentMax >= (this.lastKnownMaxX - tolerance));
+            const isAtLeftEdge = (currentMin <= tolerance);
 
-            const isAtEdge = (this.lastKnownMaxX === 0) || (currentScaleMax >= (this.lastKnownMaxX - 0.2));
-
-            if (isAtEdge) {
-                this.chart.scales.x.max = calculatedMaxX;
+            if (isAtRightEdge) {
+                if (isAtLeftEdge) {
+                    scale.max = calculatedMaxX;
+                } else {
+                    const delta = calculatedMaxX - this.lastKnownMaxX;
+                    if (delta > 0) {
+                        scale.min = currentMin + delta;
+                        scale.max = calculatedMaxX;
+                    }
+                }
             }
 
             this.lastKnownMaxX = calculatedMaxX;
         }
-
+        
         this.chart.update('none');
     }
 }
