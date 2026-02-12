@@ -48,7 +48,7 @@ export class ChartComponent {
                 },
                 zoom: {
                     limits: {
-                        x: { min: 'original', max: 'original', minRange: 0.5 }
+                        x: { minRange: 0.5 }
                     },
                     pan: { enabled: true, mode: 'x' },
                     zoom: {
@@ -62,9 +62,9 @@ export class ChartComponent {
             scales: { 
                 x: { 
                     grid: { 
-                        display: !isBar,      
-                        color: '#f0f0f0',     
-                        drawBorder: false   
+                        display: !isBar,
+                        color: '#f0f0f0',
+                        drawBorder: false
                     },
                     ticks: {
                         display: true,
@@ -74,12 +74,12 @@ export class ChartComponent {
                     }
                 },
                 y: {
-                    display: !isBar, 
-                    position: 'left', 
+                    display: !isBar,
+                    position: 'left',
                     beginAtZero: isBar,
                     grid: { 
                         color: '#f0f0f0',
-                        drawBorder: false 
+                        drawBorder: false
                     },
                     ticks: {
                         color: '#666',
@@ -153,6 +153,8 @@ export class ChartComponent {
         }
 
         // --- Aggiornamento Line Chart ---
+        let globalMaxX = 0;
+
         this.chart.data.datasets.forEach((dataset, i) => {
             const source = sources[i] || [];
             const extractor = extractors ? extractors[i] : null;
@@ -163,9 +165,19 @@ export class ChartComponent {
                     y: extractor(p)
                 })).filter(pt => pt.y !== null && isFinite(pt.y));
                 
-                this.chart.resetZoom = false; 
+                if (dataset.data.length > 0) {
+                    const lastPt = dataset.data[dataset.data.length - 1];
+                    if (lastPt.x > globalMaxX) globalMaxX = lastPt.x;
+                }
             }
         });
+        
+        // --- Applicazione Limiti Dinamici ---
+        if (this.chart.options.plugins.zoom && globalMaxX > 0) {
+            const limits = this.chart.options.plugins.zoom.limits.x;
+            limits.min = 0;
+            limits.max = globalMaxX;
+        }
         
         this.chart.update('none');
     }
