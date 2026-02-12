@@ -1,4 +1,4 @@
-import { formatDuration } from '../utils/helpers.js'; // <--- 1. NUOVO IMPORT
+import { formatDuration } from '../utils/helpers.js';
 
 export class ChartComponent {
     constructor(canvasId, type = 'line', config = []) {
