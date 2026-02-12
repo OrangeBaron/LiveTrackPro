@@ -107,21 +107,34 @@ export class ChartComponent {
             zoomOpts.limits.x.max = calculatedMaxX;
 
             const scale = this.chart.scales.x;
-            const currentMin = scale.min;
-            const currentMax = scale.max;
             
-            const tolerance = 0.2; 
-            const isAtRightEdge = (this.lastKnownMaxX === 0) || (currentMax >= (this.lastKnownMaxX - tolerance));
-            
-            if (isAtRightEdge) {
-                const windowSize = currentMax - currentMin;
+            // CASO 1: Primo caricamento
+            if (this.lastKnownMaxX === 0) {
+                scale.min = 0;
                 scale.max = calculatedMaxX;
-                if (windowSize > 0 && windowSize < calculatedMaxX) {
-                     scale.min = calculatedMaxX - windowSize;
+                this.chart.options.scales.x.min = 0;
+                this.chart.options.scales.x.max = calculatedMaxX;
+                this.lastKnownMaxX = calculatedMaxX;
+            } 
+            // CASO 2: Aggiornamenti successivi
+            else {
+                const currentMin = scale.min;
+                const currentMax = scale.max;
+                const tolerance = 0.2; 
+                const isAtRightEdge = (currentMax >= (this.lastKnownMaxX - tolerance));
+                
+                if (isAtRightEdge) {
+                    const windowSize = currentMax - currentMin;
+                    scale.max = calculatedMaxX;
+                    this.chart.options.scales.x.max = calculatedMaxX;
+                    
+                    if (windowSize > 0 && windowSize < calculatedMaxX) {
+                        scale.min = calculatedMaxX - windowSize;
+                        this.chart.options.scales.x.min = scale.min;
+                    }
                 }
+                this.lastKnownMaxX = calculatedMaxX;
             }
-
-            this.lastKnownMaxX = calculatedMaxX;
         }
         
         this.chart.update('none');
