@@ -61,6 +61,7 @@ export function getChartOptions(type) {
         scales: { 
             x: { 
                 type: isBar ? 'category' : 'linear',
+                bounds: 'data',
                 min: isBar ? undefined : 0,
                 grid: { 
                     display: !isBar,
