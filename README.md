@@ -8,7 +8,7 @@ Trasforma la semplice mappa di tracciamento in una vera e propria **plancia di a
 
 ## ✨ Funzionalità
 
-Il sistema intercetta i dati grezzi dal dispositivo Garmin ed esegue calcoli complessi direttamente nel browser per visualizzare:
+Il sistema recupera l'intero storico della sessione e intercetta i dati in tempo reale dal dispositivo Garmin per visualizzare:
 
 ### ⚡️ Power & Energy Analytics
 
@@ -19,13 +19,13 @@ Il sistema intercetta i dati grezzi dal dispositivo Garmin ed esegue calcoli com
 
 ### 🏔️ Climbing Profile
 
-* **VAM & Pendenza:** Grafico dedicato che incrocia la Velocità Ascensionale Media (m/h) con la pendenza attuale (%).
-* **Dislivello:** Tracciamento del dislivello positivo accumulato (Elevation Gain) e profilo altimetrico completo.
+* **Altimetria & Pendenza:** Grafico combinato che sovrappone l'Altitudine reale e pianificata (Course) con la Pendenza attuale (%), permettendo di correlare visivamente la durezza del tratto con il profilo del terreno.
+* **Speed & VAM:** Analisi della prestazione pura che incrocia la Velocità (km/h) con la Velocità Ascensionale Media (m/h).
 
 ### 🌤️ Ambiente & Contesto
 
 * **Live Weather:** Integrazione con **OpenWeatherMap** per visualizzare temperatura, condizioni atmosferiche, direzione e intensità del vento sul punto esatto dell'atleta.
-* **Mappa & Percorso:** Tracciamento su base OpenStreetMap con confronto visivo tra posizione reale e traccia pianificata (Course).
+* **Mappa & Smart Matching:** Tracciamento su OpenStreetMap con algoritmo di proiezione intelligente: aggancia la posizione GPS alla traccia pianificata (Course) per correggere la distanza e gestisce automaticamente le uscite dal percorso.
 * **Race Timer:** Tempo totale trascorso dall'inizio dell'attività.
 
 ### 📊 Dashboard UI
