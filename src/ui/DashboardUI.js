@@ -2,7 +2,7 @@ import { CONFIG } from '../config.js';
 import { MapComponent } from '../components/MapComponent.js';
 import { ChartComponent } from '../components/ChartComponent.js';
 import { DASHBOARD_TEMPLATE } from './DashboardTemplate.js';
-import { ViewHelpers } from './ViewHelpers.js'; // Nuovo Import
+import { ViewHelpers } from './ViewHelpers.js';
 
 export class DashboardUI {
     constructor(dataManager) {
@@ -72,7 +72,6 @@ export class DashboardUI {
         container.id = 'livetrack-pro-dashboard';
         
         // Generazione HTML dinamico usando il template
-        // Nota: Qui potremmo ottimizzare ulteriormente, ma per ora teniamo la logica esistente
         const metricsHtml = this._buildMetricsHtml();
         const summaryHtml = this._buildSummaryHtml();
 
@@ -136,7 +135,6 @@ export class DashboardUI {
     }
 
     _updateLiveMetrics(p, stats) {
-        // Helper interno per brevità
         const setTxt = (id, val) => {
             const el = document.getElementById(id);
             if (el) el.innerText = val;
@@ -147,7 +145,6 @@ export class DashboardUI {
         setTxt('live-cadence', ViewHelpers.formatInt(p.cadenceCyclesPerMin));
         setTxt('live-hr', ViewHelpers.formatInt(p.heartRateBeatsPerMin));
         
-        // Dati derivati dallo StatsEngine
         setTxt('live-gradient', ViewHelpers.formatNumber(stats?.gradient, 1));
         setTxt('live-vam', ViewHelpers.formatInt(stats?.vam));
     }
@@ -176,7 +173,27 @@ export class DashboardUI {
     }
 
     _updateCharts(live, course, hrZones, powerZones) {
-        // Line Charts
+        // --- CALCOLO MAX DISTANCE PER ASSI FISSI ---
+        let maxAxisKm = 0;
+
+        // 1. Distanza attuale atleta
+        if (live && live.length > 0) {
+            const lastP = live[live.length - 1];
+            // Preferiamo distanceKm se calcolato, altrimenti raw meters
+            const dist = lastP.distanceKm ?? (lastP.totalDistanceMeters / 1000);
+            if (dist) maxAxisKm = dist;
+        }
+
+        // 2. Distanza totale percorso (se presente)
+        if (course && course.length > 0) {
+            const lastC = course[course.length - 1];
+            const courseKm = (lastC.totalDistanceMeters || 0) / 1000;
+            if (courseKm > maxAxisKm) {
+                maxAxisKm = courseKm;
+            }
+        }
+
+        // --- LINE CHARTS (Passiamo maxAxisKm) ---
         const courseData = (course && course.length > 0) ? course : [];
         
         this.charts.elevation.update(
@@ -185,25 +202,29 @@ export class DashboardUI {
                 p => (p.altitude ?? p.elevation), // Reale
                 p => (p.altitude ?? p.elevation), // Pianificato
                 p => p.gradient                   // Pendenza
-            ]
+            ],
+            maxAxisKm
         );
 
         this.charts.climb.update(
             [live, live],
-            [p => (p.speed || 0) * 3.6, p => p.vam]
+            [p => (p.speed || 0) * 3.6, p => p.vam],
+            maxAxisKm
         );
         
         this.charts.powerHr.update(
             [live, live], 
-            [p => p.powerSmooth, p => p.heartRateBeatsPerMin]
+            [p => p.powerSmooth, p => p.heartRateBeatsPerMin],
+            maxAxisKm
         );
 
         this.charts.advanced.update(
             [live, live], 
-            [p => p.wPrimeBal, p => p.efficiency]
+            [p => p.wPrimeBal, p => p.efficiency],
+            maxAxisKm
         );
 
-        // Bar Charts
+        // --- BAR CHARTS (Non usano l'asse X metrico) ---
         if (powerZones) {
             this.charts.powerZones.update(powerZones, ['Z1', 'Z2', 'Z3', 'Z4', 'Z5', 'Z6', 'Z7']);
         }
