@@ -6,13 +6,16 @@ export class ChartComponent {
         this.type = type; 
         this.datasetsConfig = config;
         this.chart = null;
-        
-        // Stato per la "Sticky Edge"
         this.lastKnownMaxX = 0; 
     }
 
     init() {
         if (typeof Chart === 'undefined') return;
+
+        if (window.ChartZoom && typeof Chart.register === 'function') {
+            Chart.register(window.ChartZoom);
+        }
+
         const ctx = document.getElementById(this.canvasId).getContext('2d');
         const isBar = (this.type === 'bar');
 
@@ -27,17 +30,14 @@ export class ChartComponent {
                 tooltip: {
                     callbacks: {
                         title: (context) => {
-                            if (isBar) {
-                                return context[0].label;
-                            }
+                            if (isBar) return context[0].label;
                             const val = context[0].parsed.x;
                             return val.toLocaleString('it-IT', { maximumFractionDigits: 2 }) + ' km';
                         },
                         label: (context) => {
                             let label = context.dataset.label || '';
-                            if (label) {
-                                label += ': ';
-                            }
+                            if (label) label += ': ';
+                            
                             if (isBar) {
                                 label += formatDuration(context.parsed.y * 1000);
                             } else {
@@ -53,7 +53,7 @@ export class ChartComponent {
                     limits: {
                         x: { min: 0, minRange: 0.5 }
                     },
-                    pan: { enabled: true, mode: 'x' },
+                    pan: { enabled: true, mode: 'x', threshold: 10 },
                     zoom: {
                         wheel: { enabled: true },
                         pinch: { enabled: true },
@@ -61,7 +61,6 @@ export class ChartComponent {
                     }
                 }
             },
-            // --- Configurazione Assi e Griglia ---
             scales: { 
                 x: { 
                     type: isBar ? 'category' : 'linear',
@@ -82,28 +81,18 @@ export class ChartComponent {
                     display: !isBar,
                     position: 'left',
                     beginAtZero: isBar,
-                    grid: { 
-                        color: '#f0f0f0',
-                        drawBorder: false
-                    },
-                    ticks: {
-                        color: '#666',
-                        font: { size: 10 },
-                    }
+                    grid: { color: '#f0f0f0', drawBorder: false },
+                    ticks: { color: '#666', font: { size: 10 } }
                 },
                 y1: { 
                     display: false, 
                     position: 'right', 
                     grid: { drawOnChartArea: false },
-                    ticks: {
-                        color: '#666',
-                        font: { size: 10 }
-                    }
+                    ticks: { color: '#666', font: { size: 10 } }
                 }
             }
         };
 
-        // Disabilita plugin zoom su grafici a barre
         if (isBar) {
             commonOptions.plugins.zoom = false;
         }
@@ -127,12 +116,10 @@ export class ChartComponent {
             };
         });
 
-        // Configurazione Assi Dinamica (se richiesto asse Y1)
         if (datasets.some(d => d.yAxisID === 'y1')) {
             commonOptions.scales.y1.display = true;
         }
 
-        // --- Istanza Chart.js ---
         this.chart = new Chart(ctx, {
             type: this.type,
             data: { labels: [], datasets: datasets },
@@ -140,12 +127,6 @@ export class ChartComponent {
         });
     }
 
-    /**
-     * Aggiorna i dati del grafico.
-     * @param {Array} sources - Array di array contenenti i dati grezzi.
-     * @param {Array} extractors - Array di funzioni o label per estrarre i dati.
-     * @param {number|null} maxDistance - (Opzionale) Distanza massima in Km per forzare l'asse X.
-     */
     update(sources, extractors, maxDistance = null) {
         if (!this.chart) return;
 
@@ -153,7 +134,6 @@ export class ChartComponent {
         if (this.type === 'bar') {
             const values = Array.isArray(sources) ? sources : [];
             this.chart.data.datasets[0].data = values;
-            
             if (extractors && Array.isArray(extractors)) {
                 this.chart.data.labels = extractors;
             }
@@ -164,7 +144,7 @@ export class ChartComponent {
         // --- Aggiornamento Line Chart ---
         let calculatedMaxX = 0;
 
-        // 1. Aggiorna i Datasets
+        // 1. Aggiorna i dati
         this.chart.data.datasets.forEach((dataset, i) => {
             const source = sources[i] || [];
             const extractor = extractors ? extractors[i] : null;
@@ -177,12 +157,10 @@ export class ChartComponent {
             }
         });
 
-        // 2. Determina il Massimo dell'Asse X
+        // 2. Calcola o usa Max X
         if (maxDistance !== null && maxDistance > 0) {
-            // Priorità al valore passato dall'esterno
             calculatedMaxX = maxDistance;
         } else {
-            // Fallback: calcola in base ai dati presenti
             this.chart.data.datasets.forEach(d => {
                 if (d.data.length > 0) {
                     const lastPt = d.data[d.data.length - 1];
@@ -191,26 +169,23 @@ export class ChartComponent {
             });
         }
         
-        // 3. Gestione Zoom & "Sticky Edge" (Segui il fronte della corsa)
+        // 3. Gestione Zoom & Sticky Edge
         if (this.chart.options.plugins.zoom && calculatedMaxX > 0) {
-            const zoomLimits = this.chart.options.plugins.zoom.limits.x;
-            
-            // Aggiorna sempre il limite massimo navigabile
-            zoomLimits.max = calculatedMaxX;
+            const zoomOpts = this.chart.options.plugins.zoom;
 
-            // Logica "Sticky Edge": 
+            zoomOpts.limits.x.max = calculatedMaxX;
+
             const currentScaleMax = this.chart.scales.x.max;
-            const isAtEdge = (this.lastKnownMaxX === 0) || (currentScaleMax >= (this.lastKnownMaxX - 0.1));
+
+            const isAtEdge = (this.lastKnownMaxX === 0) || (currentScaleMax >= (this.lastKnownMaxX - 0.2));
 
             if (isAtEdge) {
                 this.chart.scales.x.max = calculatedMaxX;
             }
 
-            // Memorizza il nuovo massimo per il prossimo confronto
             this.lastKnownMaxX = calculatedMaxX;
         }
-        
-        // Usa 'none' per evitare animazioni pesanti durante l'update live
+
         this.chart.update('none');
     }
 }
