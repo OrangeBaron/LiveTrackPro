@@ -101,8 +101,13 @@ export class MapComponent {
                 this.hoverMarker.setStyle({ opacity: 1, fillOpacity: 1 });
 
                 let content = `<div style="text-align:center; min-width:80px;">`;
-                
-                const km = ((closest.totalDistanceMeters || 0) / 1000).toFixed(2);
+
+                const valKm = (closest.totalDistanceMeters || 0) / 1000;
+
+                const km = valKm.toLocaleString('it-IT', { 
+                    minimumFractionDigits: 2, 
+                    maximumFractionDigits: 2 
+                });
                 content += `<div style="font-weight:700; color:#fff;">${km} km</div>`;
 
                 if (type === 'live' && data.length > 0) {

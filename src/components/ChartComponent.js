@@ -23,7 +23,14 @@ export class ChartComponent {
                 legend: { display: false },
                 tooltip: {
                     callbacks: {
-label: (context) => {
+                        title: (context) => {
+                            if (isBar) {
+                                return context[0].label;
+                            }
+                            const val = context[0].parsed.x;
+                            return val.toLocaleString('it-IT', { maximumFractionDigits: 2 }) + ' km';
+                        },
+                        label: (context) => {
                             let label = context.dataset.label || '';
                             if (label) {
                                 label += ': ';
