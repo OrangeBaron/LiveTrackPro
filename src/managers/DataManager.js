@@ -1,7 +1,8 @@
 import { getDistanceFromLatLonInMeters, formatDuration } from '../utils/helpers.js';
 import { WeatherManager } from './WeatherManager.js';
 import { ElevationManager } from './ElevationManager.js';
-import { StatsEngine } from './StatsEngine.js'; // Nuovo Import
+import { StatsEngine } from './StatsEngine.js';
+import { CourseMatcher } from './CourseMatcher.js';
 
 export class DataManager {
     constructor() {
@@ -17,10 +18,13 @@ export class DataManager {
         this.listeners = [];
         this.weatherManager = new WeatherManager(() => this.notify());
         this.elevationManager = new ElevationManager();
+        this.courseMatcher = new CourseMatcher();
         
         // Motore di calcolo
         this.statsEngine = new StatsEngine();
     }
+
+    // --- Gestione Eventi ---
 
     subscribe(callback) {
         this.listeners.push(callback);
@@ -41,7 +45,6 @@ export class DataManager {
             durationSeconds = diff / 1000;
         }
 
-        // Recupera le statistiche globali calcolate dall'engine
         const globalStats = this.statsEngine.getGlobalStats(durationSeconds);
         const lastPoint = this.livePoints[this.livePoints.length - 1] || {};
 
@@ -49,7 +52,7 @@ export class DataManager {
             live: this.livePoints,
             course: this.coursePoints,
             
-            // Mapping per grafici (serie temporali)
+            // Mapping per grafici: usa la distanza proiettata (X) e il valore reale (Y)
             wPrime: this.livePoints.map(p => ({ x: p.distanceKm, y: p.wPrimeBal })),
             efficiency: this.livePoints.map(p => ({ x: p.distanceKm, y: p.efficiency })),
             
@@ -57,7 +60,7 @@ export class DataManager {
             hrZones: globalStats.hrZones,
             powerZones: globalStats.powerZones,
 
-            // Dati "Summary" per la barra superiore
+            // Dati "Summary"
             stats: {
                 duration: durationStr,
                 distance: lastPoint.totalDistanceMeters ? (lastPoint.totalDistanceMeters / 1000).toFixed(1) : '0.0',
@@ -75,10 +78,12 @@ export class DataManager {
         }));
     }
 
+    // --- Ingestione Dati ---
+
     async ingestCourse(data) {
         if (this.hasReceivedCourses) return;
 
-        // Normalizzazione Dati (gestione strutture annidate)
+        // Parsing e Normalizzazione Percorso
         let rawPoints = [];
         if (data.courses?.[0]?.coursePoints) {
             rawPoints = data.courses[0].coursePoints;
@@ -88,7 +93,6 @@ export class DataManager {
 
         if (rawPoints.length === 0) return;
 
-        // Parsing Punti Course
         this.coursePoints = [];
         let distAccumulator = 0;
 
@@ -117,6 +121,14 @@ export class DataManager {
 
         console.log(`LiveTrackPro: Course ingested locally with ${this.coursePoints.length} points.`);
         this.hasReceivedCourses = true;
+
+        // Configurazione Matcher e Riallineamento Retroattivo
+        this.courseMatcher.setCourse(this.coursePoints);
+
+        if (this.livePoints.length > 0) {
+            this.courseMatcher.processPoints(this.livePoints, 0);
+        }
+
         this.notify();
 
         // Arricchimento asincrono elevazione
@@ -130,7 +142,7 @@ export class DataManager {
         const incomingPoints = data.trackPoints;
         let startIndex = 0;
 
-        // Logica di merge (Append vs Rebuild)
+        // Logica di Merge (Append vs Rebuild)
         const lastProcessedTime = this.livePoints.length > 0 
             ? new Date(this.livePoints[this.livePoints.length - 1].dateTime).getTime() 
             : 0;
@@ -139,16 +151,14 @@ export class DataManager {
         const isAppend = (lastProcessedTime > 0) && (firstIncomingTime > lastProcessedTime);
 
         if (isAppend) {
-            // Append Mode: aggiungi solo i nuovi punti
             const newPoints = incomingPoints.filter(p => new Date(p.dateTime).getTime() > lastProcessedTime);
             if (newPoints.length === 0) return;
 
             newPoints.forEach(p => this.rawLivePoints.set(p.dateTime, p));
-            startIndex = this.livePoints.length; // Ricorda dove eravamo rimasti
+            startIndex = this.livePoints.length;
             this.livePoints.push(...newPoints);
 
         } else {
-            // Rebuild Mode: ricalcola tutto (es. caricamento iniziale o refresh pagina)
             incomingPoints.forEach(p => {
                 if (p.dateTime) this.rawLivePoints.set(p.dateTime, p);
             });
@@ -156,14 +166,19 @@ export class DataManager {
             this.livePoints = Array.from(this.rawLivePoints.values())
                 .sort((a, b) => new Date(a.dateTime) - new Date(b.dateTime));
             
-            this.statsEngine.reset(); // Reset totale accumulatori
+            this.statsEngine.reset();
             startIndex = 0;
         }
         
-        // DELEGA: Lascia che sia l'Engine a fare i calcoli sui punti
+        // Elaborazione: Metriche Reali
         this.statsEngine.processPoints(this.livePoints, startIndex);
         
-        // Aggiorna Meteo (solo sull'ultimo punto)
+        // Elaborazione: Proiezione su Percorso (Elastic Band)
+        if (this.hasReceivedCourses && this.coursePoints.length > 0) {
+            this.courseMatcher.processPoints(this.livePoints, startIndex);
+        }
+
+        // Aggiornamento Meteo
         const lastP = this.livePoints[this.livePoints.length - 1];
         if (lastP?.position?.lat) {
             this.weatherManager.update(lastP.position.lat, lastP.position.lon);
