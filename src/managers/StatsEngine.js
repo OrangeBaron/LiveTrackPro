@@ -55,7 +55,7 @@ export class StatsEngine {
             const nativeDist = (p.distanceMeters ?? p.totalDistanceMeters ?? null);
 
             if (nativeDist !== null) {
-                distAccumulator = nativeDist;
+                distAccumulator = Math.max(distAccumulator, nativeDist);
             } else if (i > 0) {
                 const prev = points[i - 1];
                 if (p.position && prev.position) {
