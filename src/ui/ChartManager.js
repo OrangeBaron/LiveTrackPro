@@ -41,24 +41,31 @@ export class ChartManager {
     }
 
     update(live, course, hrZones, powerZones) {
-        // Calcolo asse X comune (Distanza Massima)
-        let maxAxisKm = 0;
-
+        // 1. Calcolo Distanza Reale
+        let liveMaxKm = 0;
         if (live && live.length > 0) {
             const lastP = live[live.length - 1];
             const dist = lastP.distanceKm ?? (lastP.totalDistanceMeters / 1000);
-            if (dist) maxAxisKm = dist;
+            if (dist) liveMaxKm = dist;
         }
+
+        // 2. Calcolo Distanza Totale
+        let overallMaxKm = liveMaxKm; 
 
         if (course && course.length > 0) {
             const lastC = course[course.length - 1];
             const courseKm = (lastC.totalDistanceMeters || 0) / 1000;
-            if (courseKm > maxAxisKm) maxAxisKm = courseKm;
+            
+            if (courseKm > overallMaxKm) {
+                overallMaxKm = courseKm;
+            }
         }
 
         const courseData = (course && course.length > 0) ? course : [];
         
-        // Update Line Charts
+        // --- Aggiornamento Grafici ---
+
+        // A. GRAFICO ALTIMETRIA
         this.charts.elevation.update(
             [live, courseData, live], 
             [
@@ -66,25 +73,27 @@ export class ChartManager {
                 p => (p.altitude ?? p.elevation), 
                 p => p.gradient                   
             ],
-            maxAxisKm
+            overallMaxKm
         );
+
+        // B. GRAFICI TELEMETRIA
 
         this.charts.climb.update(
             [live, live],
             [p => (p.speed || 0) * 3.6, p => p.vam],
-            maxAxisKm
+            liveMaxKm
         );
         
         this.charts.powerHr.update(
             [live, live], 
             [p => p.powerSmooth, p => p.heartRateBeatsPerMin],
-            maxAxisKm
+            liveMaxKm
         );
 
         this.charts.advanced.update(
             [live, live], 
             [p => p.wPrimeBal, p => p.efficiency],
-            maxAxisKm
+            liveMaxKm
         );
 
         // Update Bar Charts
