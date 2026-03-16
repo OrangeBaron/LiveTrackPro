@@ -51,13 +51,63 @@ export class CyclingPhysics {
     }
 
     /**
-     * Calcola l'efficienza aerobica istantanea (Pw:Hr)
+     * Calcola l'efficienza aerobica avanzata (Pw:Hr)
+     * Include Shift Temporale (Lag), Filtro Coasting e Media Mobile.
      */
-    static calculateEfficiency(power, hr) {
-        // Filtriamo valori senza senso (es. fermi o senza fascia cardio)
-        if (power > 10 && hr > 40) {
-            return parseFloat((power / hr).toFixed(2));
+    static calculateEfficiency(points, currentIndex, lagSeconds = 30, windowSeconds = 60) {
+        const currentP = points[currentIndex];
+        const pTimeMs = new Date(currentP.dateTime).getTime();
+        const lagMs = lagSeconds * 1000;
+        const windowMs = windowSeconds * 1000;
+
+        // 1. Troviamo la potenza ritardata (Shift Temporale)
+        // La frequenza cardiaca è lenta a salire/scendere. Confrontiamo i battiti 
+        // attuali con i watt che li hanno generati (es. 30 secondi fa).
+        let shiftedPower = null;
+        for (let k = currentIndex; k >= 0; k--) {
+            const pastTime = new Date(points[k].dateTime).getTime();
+            if (pTimeMs - pastTime >= lagMs) {
+                shiftedPower = points[k].powerWatts;
+                break;
+            }
         }
+
+        // 2. Calcolo Efficienza Istantanea e Filtraggio
+        // Escludiamo le fasi di discesa (coasting) o Watt troppo bassi che "sporcano" la media
+        const hr = currentP.heartRateBeatsPerMin || 0;
+        if (shiftedPower !== null && shiftedPower >= 30 && hr > 60) {
+            // Salviamo il dato istantaneo pulito come metrica temporanea
+            currentP._instEff = shiftedPower / hr;
+        } else {
+            currentP._instEff = null;
+        }
+
+        // 3. Applichiamo la Media Mobile (Smoothing)
+        // Aggreghiamo l'efficienza istantanea degli ultimi 'windowSeconds'
+        let sumEff = 0;
+        let countEff = 0;
+
+        for (let k = currentIndex; k >= 0; k--) {
+            const pastP = points[k];
+            const pastTime = new Date(pastP.dateTime).getTime();
+            
+            // Se usciamo dalla finestra temporale impostata (es. ultimi 60 sec), ci fermiamo
+            if (pTimeMs - pastTime > windowMs) break;
+            
+            // Accumuliamo solo i dati che hanno superato il filtro al punto 2
+            if (pastP._instEff !== null && pastP._instEff !== undefined) {
+                sumEff += pastP._instEff;
+                countEff++;
+            }
+        }
+
+        // 4. Validazione finale
+        // Restituiamo il dato solo se abbiamo almeno un paio di campioni validi
+        // nella nostra finestra temporale, altrimenti mostriamo un buco nel grafico (corretto).
+        if (countEff >= 3) {
+            return parseFloat((sumEff / countEff).toFixed(2));
+        }
+        
         return null;
     }
 

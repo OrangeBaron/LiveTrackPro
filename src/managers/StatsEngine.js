@@ -113,7 +113,7 @@ export class StatsEngine {
             p.distanceKm = distAccumulator / 1000;
             p.wPrimeBal = this.wPrimeBalance;
             p.powerSmooth = Math.round(smoothPower); 
-            p.efficiency = CyclingPhysics.calculateEfficiency(smoothPower, p.heartRateBeatsPerMin);
+            p.efficiency = CyclingPhysics.calculateEfficiency(points, i, 30, 60);
             
             // Normalizzazione velocità
             if (p.speed === undefined && p.speedMetersPerSec !== undefined) {
