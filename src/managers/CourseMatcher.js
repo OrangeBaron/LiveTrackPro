@@ -16,7 +16,12 @@ export class CourseMatcher {
         this.distSinceExit = 0;
         
         this.MAX_OFF_COURSE_DIST = 70;
-        this.SEARCH_WINDOW = 500;
+        
+        // Finestra di ricerca ridotta per evitare salti in avanti sui circuiti
+        this.SEARCH_WINDOW = 40; 
+        
+        // Margine all'indietro per compensare errori/jittering del GPS
+        this.LOOK_BACK = 5; 
     }
 
     setCourse(points) {
@@ -84,9 +89,11 @@ export class CourseMatcher {
         let minDistance = Infinity;
         let bestIndex = this.lastMatchIndex;
         
+        // Inizia la ricerca un po' prima dell'ultimo indice per tollerare errori GPS
+        const startSearch = Math.max(0, this.lastMatchIndex - this.LOOK_BACK);
         const maxSearch = Math.min(this.coursePoints.length, this.lastMatchIndex + this.SEARCH_WINDOW);
 
-        for (let j = this.lastMatchIndex; j < maxSearch; j++) {
+        for (let j = startSearch; j < maxSearch; j++) {
             const courseP = this.coursePoints[j];
             const d = getDistanceFromLatLonInMeters(
                 livePoint.position.lat, livePoint.position.lon,
