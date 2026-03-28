@@ -16,11 +16,7 @@ export class CourseMatcher {
         this.distSinceExit = 0;
         
         this.MAX_OFF_COURSE_DIST = 70;
-        
-        // Finestra di ricerca ridotta per evitare salti in avanti sui circuiti
         this.SEARCH_WINDOW = 40; 
-        
-        // Margine all'indietro per compensare errori/jittering del GPS
         this.LOOK_BACK = 5; 
     }
 
@@ -57,8 +53,15 @@ export class CourseMatcher {
                 
                 const courseP = this.coursePoints[match.index];
                 if (courseP.totalDistanceMeters !== undefined) {
-                    p.distanceKm = courseP.totalDistanceMeters / 1000;
-                    this.exitCourseDistMeters = courseP.totalDistanceMeters;
+                    let projectedKm = courseP.totalDistanceMeters / 1000;
+
+                    // FIX GLITCH: Impediamo ad asse X di tornare indietro
+                    if (i > 0 && livePoints[i-1].distanceKm !== undefined) {
+                        projectedKm = Math.max(livePoints[i-1].distanceKm, projectedKm);
+                    }
+                    
+                    p.distanceKm = projectedKm;
+                    this.exitCourseDistMeters = projectedKm * 1000;
                 }
 
             } else {
@@ -116,8 +119,9 @@ export class CourseMatcher {
         const endDist = (this.coursePoints[entryIndex]?.totalDistanceMeters || 0);
         const gapSize = endDist - startDist;
 
+        // FIX GLITCH: Scegliamo sempre la distanza maggiore per evitare salti indietro
         if (gapSize <= 0) {
-            const safeDist = endDist / 1000;
+            const safeDist = Math.max(startDist, endDist) / 1000;
             bufferPoints.forEach(p => p.distanceKm = safeDist);
             return;
         }
