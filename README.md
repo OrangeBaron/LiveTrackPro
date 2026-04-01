@@ -6,7 +6,7 @@
 
 Trasforma la semplice mappa di tracciamento in una vera e propria **plancia di analisi in tempo reale** (stile ammiraglia), offrendo metriche professionali come TSS, Potenza Normalizzata, VAM, W' Balance e dati Meteo, solitamente disponibili solo post-attività.
 
-![sample image](https://imagizer.imageshack.com/img924/7290/yvfHQJ.jpg)
+![sample image](https://imagizer.imageshack.com/img924/7978/zblzQq.jpg)
 
 ## ✨ Funzionalità
 
